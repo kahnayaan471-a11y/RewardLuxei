@@ -1,6 +1,7 @@
 import React from 'react';
 import { User as UserIcon, Zap } from 'lucide-react';
 import { GoldCoin } from './GoldCoin';
+import { PWAInstallButton } from './PWAInstallButton';
 import { useAuth } from '../context/AuthContext';
 import { getTodayDateString, getYesterdayDateString } from '../services/coinService';
 
@@ -42,6 +43,9 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Badges */}
         <div className="flex items-center gap-2">
+          {/* In-App PWA Install Prompt */}
+          <PWAInstallButton />
+
           {/* Live Coin Wallet Button with Custom Gold Coin */}
           {currentUser && profile ? (
             <button
