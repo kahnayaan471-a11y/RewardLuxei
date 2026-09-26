@@ -20,7 +20,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onChangeTab }
     <div className="fixed bottom-4 left-0 right-0 z-40 px-4 flex justify-center pointer-events-none">
       <nav
         aria-label="Bottom Navigation"
-        className="pointer-events-auto w-full max-w-md bg-white rounded-3xl py-2 px-3 shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-slate-200/90 flex items-center justify-around transform-gpu"
+        className="pointer-events-auto w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl py-2 px-3 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.12),0_8px_10px_-6px_rgba(0,0,0,0.08)] border border-slate-100 flex items-center justify-around"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
