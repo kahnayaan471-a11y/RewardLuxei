@@ -1,0 +1,292 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with balance, streak, and daily play limits",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "photoURL": { "type": "string" },
+        "coins": { "type": "number" },
+        "totalEarned": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "referralCode": { "type": "string", "maxLength": 20 },
+        "referredBy": { "type": "string" },
+        "referralCount": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "isBanned": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "completedTasksCount": { "type": "number" },
+        "requiredTasksForWithdrawal": { "type": "number" },
+        "dailyStreak": { "type": "number" },
+        "lastCheckInDate": { "type": "string" },
+        "spinsLeftToday": { "type": "number" },
+        "lastSpinDate": { "type": "string" },
+        "scratchesLeftToday": { "type": "number" },
+        "lastScratchDate": { "type": "string" },
+        "captchasLeftToday": { "type": "number" },
+        "lastCaptchaDate": { "type": "string" },
+        "lastIp": { "type": "string", "description": "Client IP address for fraud detection" },
+        "networkType": { "type": "string", "description": "Network connection type" },
+        "deviceId": { "type": "string", "description": "Unique device fingerprint" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "coins", "role"]
+    },
+    "CoinTransaction": {
+      "title": "Coin Transaction",
+      "description": "Ledger entry for coin earnings and deductions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["spin", "scratch", "captcha", "daily_checkin", "referral_bonus", "referral_signup", "referral_commission", "withdrawal_deduct", "withdrawal_refund", "admin_adjustment"]
+        },
+        "amount": { "type": "number" },
+        "description": { "type": "string", "maxLength": 200 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["userId", "type", "amount", "timestamp"]
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Cash payout withdrawal request via UPI or Bank",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "coins": { "type": "number" },
+        "amountInr": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["upi", "bank"] },
+        "upiId": { "type": "string" },
+        "bankAccountNumber": { "type": "string" },
+        "bankIfscCode": { "type": "string" },
+        "bankAccountHolderName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "ipAddress": { "type": "string", "description": "IP at time of withdrawal" },
+        "networkType": { "type": "string", "description": "Network type at time of withdrawal" },
+        "deviceId": { "type": "string", "description": "Device ID at time of withdrawal" },
+        "createdAt": { "type": "number" },
+        "processedAt": { "type": "number" },
+        "adminNotes": { "type": "string" }
+      },
+      "required": ["userId", "coins", "amountInr", "paymentMethod", "status", "createdAt"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "Global admin settings for game limits and conversion rates",
+      "type": "object",
+      "properties": {
+        "coinToInrRate": { "type": "number" },
+        "minWithdrawalCoins": { "type": "number" },
+        "referralRewardCoins": { "type": "number" },
+        "referralCommissionPercent": { "type": "number" },
+        "dailySpinLimit": { "type": "number" },
+        "dailyScratchLimit": { "type": "number" },
+        "dailyCaptchaLimit": { "type": "number" },
+        "maintenanceMode": { "type": "boolean" }
+      },
+      "required": ["coinToInrRate", "minWithdrawalCoins"]
+    },
+    "SupportConversation": {
+      "title": "Support Conversation",
+      "description": "User support ticket conversation thread",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "number" },
+        "lastSender": { "type": "string", "enum": ["user", "bot", "admin"] },
+        "unreadByAdmin": { "type": "number" },
+        "unreadByUser": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "resolved", "pending_admin"] }
+      },
+      "required": ["userId", "lastMessage", "lastMessageAt", "status"]
+    },
+    "SupportMessage": {
+      "title": "Support Message",
+      "description": "Individual message in support chat",
+      "type": "object",
+      "properties": {
+        "conversationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "bot", "admin"] },
+        "text": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["conversationId", "userId", "sender", "timestamp"]
+    },
+    "PromoCode": {
+      "title": "Promo Code",
+      "description": "Promotional coupon code for instant free coins",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "rewardCoins": { "type": "number" },
+        "description": { "type": "string" },
+        "maxUses": { "type": "number" },
+        "usedCount": { "type": "number" },
+        "perUserLimit": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "active": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["code", "rewardCoins", "active", "createdAt"]
+    },
+    "PromoCodeRedemption": {
+      "title": "Promo Code Redemption",
+      "description": "User redemption record for a promo code",
+      "type": "object",
+      "properties": {
+        "promoCodeId": { "type": "string" },
+        "code": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "rewardCoins": { "type": "number" },
+        "redeemedAt": { "type": "number" }
+      },
+      "required": ["promoCodeId", "code", "userId", "rewardCoins", "redeemedAt"]
+    },
+    "PhysicalPrizeClaim": {
+      "title": "Physical Prize Claim",
+      "description": "User claim request for referral milestones",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "prizeType": { "type": "string" },
+        "prizeTitle": { "type": "string" },
+        "tshirtSize": { "type": "string" },
+        "shippingAddress": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "pincode": { "type": "string" },
+        "status": { "type": "string", "enum": ["submitted", "pending", "approved", "rejected", "processing", "shipped", "delivered"] },
+        "adminNotes": { "type": "string" },
+        "claimedAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "prizeType", "prizeTitle", "status", "claimedAt"]
+    },
+    "GiveawayEntry": {
+      "title": "Giveaway Entry",
+      "description": "User participation record for giveaway",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "giveawayId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "entryFeeCoins": { "type": "number" },
+        "enteredAt": { "type": "number" }
+      },
+      "required": ["giveawayId", "userId", "userName", "enteredAt"]
+    },
+    "FreeFireTournament": {
+      "title": "Free Fire MAX Tournament",
+      "description": "Admin scheduled Free Fire MAX custom room matches and tournaments",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "gameMode": { "type": "string", "enum": ["solo", "duo", "squad", "clash_squad"] },
+        "mapName": { "type": "string" },
+        "entryFeeCoins": { "type": "number" },
+        "prizePoolCoins": { "type": "number" },
+        "perKillCoins": { "type": "number" },
+        "maxSlots": { "type": "number" },
+        "joinedSlots": { "type": "number" },
+        "matchDateTime": { "type": "string" },
+        "matchTimestamp": { "type": "number" },
+        "roomId": { "type": "string" },
+        "roomPassword": { "type": "string" },
+        "roomCredentialsReleased": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["upcoming", "ongoing", "completed", "cancelled"] },
+        "rules": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "gameMode", "mapName", "entryFeeCoins", "prizePoolCoins", "maxSlots", "status"]
+    },
+    "TournamentParticipant": {
+      "title": "Tournament Participant",
+      "description": "User registration for Free Fire MAX tournament with IGN and player ID",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "freeFireName": { "type": "string" },
+        "freeFireUid": { "type": "string" },
+        "entryFeePaid": { "type": "number" },
+        "slotNumber": { "type": "number" },
+        "joinedAt": { "type": "number" }
+      },
+      "required": ["tournamentId", "userId", "freeFireName", "entryFeePaid", "joinedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile collection"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "CoinTransaction",
+      "description": "Coin transaction history"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Withdrawal requests"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppSettings",
+      "description": "Global settings"
+    },
+    "/support_conversations/{conversationId}": {
+      "schema": "SupportConversation",
+      "description": "Support conversation threads"
+    },
+    "/support_messages/{messageId}": {
+      "schema": "SupportMessage",
+      "description": "Support messages and photo proofs"
+    },
+    "/promo_codes/{promoId}": {
+      "schema": "PromoCode",
+      "description": "Promotional codes catalog"
+    },
+    "/promo_redemptions/{redemptionId}": {
+      "schema": "PromoCodeRedemption",
+      "description": "User redemptions log"
+    },
+    "/prize_claims/{claimId}": {
+      "schema": "PhysicalPrizeClaim",
+      "description": "Physical prize claims for admin approval"
+    },
+    "/giveaway_entries/{entryId}": {
+      "schema": "GiveawayEntry",
+      "description": "Giveaway participant entries"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": "FreeFireTournament",
+      "description": "Free Fire MAX tournament list"
+    },
+    "/tournament_participants/{participantId}": {
+      "schema": "TournamentParticipant",
+      "description": "Free Fire MAX tournament participant registrations"
+    }
+  }
+}

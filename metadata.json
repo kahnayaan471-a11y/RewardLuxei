@@ -1,0 +1,8 @@
+{
+  "name": "Rewardluxe",
+  "description": "Earn coins with daily check-in, lucky spin wheel, scratch cards, Free Fire MAX Esports tournaments, and captchas. Withdraw real cash via UPI, Google Play Gift Code, and Bank Transfer with full Admin Approval & Analytics dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

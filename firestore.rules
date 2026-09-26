@@ -1,0 +1,81 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // User profile documents
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+    
+    // Withdrawal requests
+    match /withdrawals/{withdrawalId} {
+      allow read, write: if true;
+    }
+    
+    // Transactions history
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    // App settings (admin configurable)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Tasks & Offers (Admin created, public read & write)
+    match /tasks/{taskId} {
+      allow read, write: if true;
+    }
+
+    // User task completion status
+    match /user_tasks/{userTaskId} {
+      allow read, write: if true;
+    }
+
+    // Support Conversations (allow guest users and registered users)
+    match /support_conversations/{conversationId} {
+      allow read, write: if true;
+    }
+
+    // Support Live Messages & Proof Attachments (allow guest users and registered users)
+    match /support_messages/{messageId} {
+      allow read, write: if true;
+    }
+
+    // Promo / Coupon Codes
+    match /promo_codes/{promoId} {
+      allow read, write: if true;
+    }
+
+    // Promo Code Redemptions
+    match /promo_redemptions/{redemptionId} {
+      allow read, write: if true;
+    }
+
+    // Physical Prize Claims (Referral milestone claims)
+    match /prize_claims/{claimId} {
+      allow read, write: if true;
+    }
+
+    // Giveaway Entries
+    match /giveaway_entries/{entryId} {
+      allow read, write: if true;
+    }
+
+    // Free Fire MAX Tournaments
+    match /tournaments/{tournamentId} {
+      allow read, write: if true;
+    }
+
+    // Free Fire MAX Tournament Participants
+    match /tournament_participants/{participantId} {
+      allow read, write: if true;
+    }
+  }
+}
