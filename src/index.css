@@ -1,13 +1,43 @@
 @import "tailwindcss";
 
 @layer base {
-  body {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Zero tap delay & hardware acceleration */
+  button, a, input, select {
+    touch-action: manipulation;
+  }
+
+  img, svg {
+    content-visibility: auto;
+  }
+
+  #root {
+    min-height: 100%;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 
   h1, h2, h3, h4, h5, h6, .font-display {
     font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
   }
+}
+
+/* Hardware accelerated smooth transitions */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 /* Custom scrollbar */

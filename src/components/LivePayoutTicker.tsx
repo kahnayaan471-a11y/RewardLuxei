@@ -161,7 +161,7 @@ export const LivePayoutTicker: React.FC = () => {
     }
 
     return () => clearTimeout(timer);
-  }, [isVisible, isDismissed, realPayouts]);
+  }, [isVisible, isDismissed]);
 
   if (isDismissed || !currentItem) {
     return null;
@@ -183,15 +183,15 @@ export const LivePayoutTicker: React.FC = () => {
 
   return (
     <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-3 w-full max-w-sm sm:max-w-md flex justify-center">
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isVisible && currentItem && (
           <motion.div
             key={currentItem.id}
-            initial={{ opacity: 0, y: -24, scale: 0.85 }}
+            initial={{ opacity: 0, y: -16, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.85 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-            className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white pl-2 pr-3 py-1.5 rounded-full shadow-2xl border border-emerald-500/40 flex items-center gap-2 max-w-full text-xs font-medium tracking-wide shadow-emerald-950/50"
+            exit={{ opacity: 0, y: -12, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="pointer-events-auto bg-slate-900 text-white pl-2 pr-3 py-1.5 rounded-full shadow-xl border border-emerald-500/40 flex items-center gap-2 max-w-full text-xs font-medium tracking-wide transform-gpu"
           >
             {/* User Avatar Circle with Image or Gradient */}
             {currentItem.photoURL ? (

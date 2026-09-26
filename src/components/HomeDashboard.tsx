@@ -284,10 +284,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   return (
     <div className="space-y-4 sm:space-y-5 pb-24 max-w-2xl mx-auto">
       {/* 1. Hero Main Wallet Box */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-3xl p-5 sm:p-6 text-white shadow-2xl relative overflow-hidden border border-slate-700/60">
-        {/* Glow backdrop circles */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden border border-slate-700/60 transform-gpu">
+        {/* Glow backdrop without heavy gaussian blurs */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[radial-gradient(circle,rgba(245,158,11,0.18)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-[radial-gradient(circle,rgba(168,85,247,0.18)_0%,transparent_70%)] pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -512,9 +512,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         whileHover={{ scale: 1.015, y: -2 }}
         whileTap={{ scale: 0.98 }}
         onClick={onOpenPromoModal}
-        className="group cursor-pointer bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-slate-950 shadow-xl shadow-amber-500/20 relative overflow-hidden border-2 border-amber-300 transition-all"
+        className="group cursor-pointer bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 rounded-3xl p-4 sm:p-5 text-slate-950 shadow-lg shadow-amber-500/15 relative overflow-hidden border-2 border-amber-300 transition-all transform-gpu"
       >
-        <div className="absolute -right-8 -top-8 w-28 h-28 bg-white/30 rounded-full blur-xl pointer-events-none" />
+        <div className="absolute -right-8 -top-8 w-28 h-28 bg-[radial-gradient(circle,rgba(255,255,255,0.35)_0%,transparent_70%)] pointer-events-none" />
 
         <div className="relative z-10 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
@@ -545,11 +545,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           whileHover={{ scale: 1.015, y: -2 }}
           whileTap={{ scale: 0.98 }}
           onClick={onOpenTasks}
-          className="group cursor-pointer bg-gradient-to-br from-[#2D0A4E] via-[#4A0E78] to-[#1E0638] rounded-3xl p-4 sm:p-5 text-white shadow-xl shadow-purple-900/25 relative overflow-hidden border-2 border-purple-400/40 transition-all hover:border-purple-300"
+          className="group cursor-pointer bg-gradient-to-br from-[#2D0A4E] via-[#4A0E78] to-[#1E0638] rounded-3xl p-4 sm:p-5 text-white shadow-xl shadow-purple-900/25 relative overflow-hidden border-2 border-purple-400/40 transition-all hover:border-purple-300 transform-gpu"
         >
           {/* Subtle glow circles */}
-          <div className="absolute -top-12 -right-12 w-44 h-44 bg-purple-500/25 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-12 -right-12 w-44 h-44 bg-[radial-gradient(circle,rgba(168,85,247,0.25)_0%,transparent_70%)] pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-[radial-gradient(circle,rgba(245,158,11,0.2)_0%,transparent_70%)] pointer-events-none" />
 
           <div className="relative z-10 flex items-center justify-between gap-3 sm:gap-4">
             {/* Left: Icon and Title */}
@@ -586,11 +586,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
                 onGoToReferral();
               }
             }}
-            className="group cursor-pointer bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-3xl p-4 sm:p-5 text-white shadow-2xl shadow-amber-500/15 relative overflow-hidden border-2 border-amber-400/50 transition-all hover:border-amber-300"
+            className="group cursor-pointer bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-3xl p-4 sm:p-5 text-white shadow-xl shadow-amber-500/10 relative overflow-hidden border-2 border-amber-400/50 transition-all hover:border-amber-300 transform-gpu"
           >
-            {/* Animated Gold Shimmer background glow */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/30 transition-colors" />
-            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-yellow-500/15 rounded-full blur-3xl pointer-events-none" />
+            {/* Shimmer background glow */}
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-[radial-gradient(circle,rgba(245,158,11,0.2)_0%,transparent_70%)] pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-[radial-gradient(circle,rgba(234,179,8,0.15)_0%,transparent_70%)] pointer-events-none" />
 
             {/* Top VIP Accent stripe */}
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-500 shadow-sm shadow-amber-500/50" />
@@ -627,9 +627,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             whileHover={{ scale: 1.015, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={onOpenTournament}
-            className="group cursor-pointer bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-500 rounded-3xl p-4 sm:p-5 text-slate-950 shadow-xl shadow-orange-600/25 relative overflow-hidden border-2 border-amber-300 transition-all"
+            className="group cursor-pointer bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-500 rounded-3xl p-4 sm:p-5 text-slate-950 shadow-xl shadow-orange-600/20 relative overflow-hidden border-2 border-amber-300 transition-all transform-gpu"
           >
-            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/30 rounded-full blur-xl pointer-events-none" />
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-[radial-gradient(circle,rgba(255,255,255,0.35)_0%,transparent_70%)] pointer-events-none" />
 
             <div className="relative z-10 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3.5 min-w-0">
