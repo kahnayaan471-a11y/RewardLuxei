@@ -28,7 +28,7 @@ const RANDOM_NAMES = [
   'Amitabh K.', 'Babulal M.', 'Ishaan V.', 'Zoya Khan', 'Rohan Mathur'
 ];
 
-const AMOUNTS = [10, 20, 25, 30, 50, 50, 75, 100, 100, 150, 200, 500];
+const AMOUNTS = [10, 10, 20, 20, 30, 30, 50, 50, 100, 100, 250, 500, 1000];
 const METHODS: Array<'upi' | 'google_play' | 'bank_transfer'> = [
   'upi', 'upi', 'upi', 'google_play', 'google_play', 'bank_transfer'
 ];
@@ -224,7 +224,7 @@ export const LivePayoutTicker: React.FC = () => {
               <span className="text-slate-300 text-[10px] sm:text-[11px]">ne</span>
               <span className="font-black text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 shrink-0 text-[11px]">
                 <IndianRupee className="w-3 h-3 stroke-[3]" />
-                {currentItem.inrAmount} {getMethodBadge(currentItem.method)}
+                {currentItem.inrAmount} ({(currentItem.inrAmount * 100).toLocaleString()} Coins) {getMethodBadge(currentItem.method)}
               </span>
               <span className="text-slate-300 text-[10px] sm:text-[11px]">withdraw kiya</span>
             </div>

@@ -91,6 +91,7 @@ import {
   rejectWithdrawal,
   adminAdjustUserCoins,
   adminAdjustUserReferrals,
+  adminBulkAddCoinsAndReferralsToDemoUsers,
   adminResetAllUserCoinsOnly,
   adminResetAllUsersCoinsAndReferrals,
   adminResetUserCoinsAndReferrals,
@@ -235,6 +236,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const [showResetAllModal, setShowResetAllModal] = useState<boolean>(false);
   const [showResetCoinsModal, setShowResetCoinsModal] = useState<boolean>(false);
   const [resetAllLoading, setResetAllLoading] = useState<boolean>(false);
+
+  // Bulk Auto-Add / Randomize Coins & Referrals Modal State (Demo Users Only)
+  const [showBulkAddModal, setShowBulkAddModal] = useState<boolean>(false);
+  const [minCoins, setMinCoins] = useState<number>(2000);
+  const [maxCoins, setMaxCoins] = useState<number>(6000);
+  const [minRefs, setMinRefs] = useState<number>(3);
+  const [maxRefs, setMaxRefs] = useState<number>(20);
+  const [bulkActionLoading, setBulkActionLoading] = useState<boolean>(false);
+
+  const handleConfirmBulkAdd = async () => {
+    setBulkActionLoading(true);
+    try {
+      const res = await adminBulkAddCoinsAndReferralsToDemoUsers(minCoins, maxCoins, minRefs, maxRefs);
+      sound.playWin();
+      alert(`🤖 Success! Updated ${res.totalUpdated} Demo Users with random coins between ${minCoins.toLocaleString()} and ${maxCoins.toLocaleString()}!`);
+      setShowBulkAddModal(false);
+      await loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Demo Users random range update failed';
+      alert(`Error: ${msg}`);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
 
   // Edit Task Requirements Modal for a user
   const [reqEditUser, setReqEditUser] = useState<UserProfile | null>(null);
@@ -2761,6 +2786,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
             </button>
 
             <button
+              onClick={() => setShowBulkAddModal(true)}
+              className="px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/20 active:scale-95 cursor-pointer"
+              title="Auto-Add Coins & Referrals to ALL Demo Users at once!"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 stroke-[3]" />
+              <span>🤖 Auto-Boost Demo Users</span>
+            </button>
+
+            <button
               onClick={() => setShowResetCoinsModal(true)}
               className="px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
               title="Reset or zero out all coins for all real users (excluding admin)"
@@ -4150,27 +4184,101 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
         )}
       </AnimatePresence>
 
-      {/* ADJUST COINS MODAL */}
+      {/* ADJUST COINS MODAL (ADD OR MINUS COINS) */}
       {adjustUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
           <div className="bg-[#0E1524] text-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-800">
-            <h3 className="font-display font-black text-lg text-white mb-1">
-              Adjust Coins for {adjustUser.displayName}
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">Current Coins: <span className="text-amber-400 font-bold">{adjustUser.coins}</span></p>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-display font-black text-lg text-white">
+                Adjust Coins for {adjustUser.displayName || 'User'}
+              </h3>
+              <button
+                onClick={() => setAdjustUser(null)}
+                className="text-slate-400 hover:text-white text-sm font-bold p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">Current Wallet Balance: <span className="text-amber-400 font-bold">{(adjustUser.coins || 0).toLocaleString()} Coins</span></p>
 
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1">
-                  Coins Amount (Positive to add, Negative to deduct)
+                  Coins Amount Change (Positive = Add, Negative = Minus)
                 </label>
                 <input
                   type="number"
                   value={adjustAmount}
                   onChange={(e) => setAdjustAmount(Number(e.target.value))}
-                  placeholder="e.g. 500 or -200"
-                  className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold text-amber-400 focus:border-amber-400 focus:outline-hidden"
+                  placeholder="e.g. 500 or -500"
+                  className={`w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold focus:outline-hidden ${
+                    adjustAmount < 0 ? 'text-rose-400 focus:border-rose-500' : 'text-amber-400 focus:border-amber-400'
+                  }`}
                 />
+              </div>
+
+              {/* Quick Add / Minus Option Buttons */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 block mb-1.5">
+                  Quick Add or Minus Options:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(100)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === 100 ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                  >
+                    +100 Coins
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(500)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === 500 ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                  >
+                    +500 Coins
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(1000)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === 1000 ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black' : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    }`}
+                  >
+                    +1,000 Coins
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(-100)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === -100 ? 'bg-rose-500 text-white border-rose-400 font-black' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    -100 (Minus)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(-500)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === -500 ? 'bg-rose-500 text-white border-rose-400 font-black' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    -500 (Minus)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustAmount(-1000)}
+                    className={`px-2 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all cursor-pointer ${
+                      adjustAmount === -1000 ? 'bg-rose-500 text-white border-rose-400 font-black' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    -1,000 (Minus)
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -4181,7 +4289,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                   type="text"
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="e.g. Special Contest Winner"
+                  placeholder="e.g. Special Contest or Balance Correction"
                   className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:border-amber-400 focus:outline-hidden"
                 />
               </div>
@@ -4189,18 +4297,177 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
 
             <div className="flex gap-2 mt-5">
               <button
+                type="button"
                 onClick={() => setAdjustUser(null)}
-                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Cancel
               </button>
 
               <button
+                type="button"
                 onClick={handleConfirmAdjust}
                 disabled={actionLoading}
-                className="flex-1 py-2.5 bg-amber-400 hover:bg-amber-500 text-slate-950 font-black rounded-xl text-xs shadow-md transition-all active:scale-98"
+                className={`flex-1 py-2.5 font-black rounded-xl text-xs shadow-md transition-all active:scale-98 cursor-pointer ${
+                  adjustAmount < 0
+                    ? 'bg-rose-500 hover:bg-rose-600 text-white'
+                    : 'bg-amber-400 hover:bg-amber-500 text-slate-950'
+                }`}
               >
-                {actionLoading ? 'Saving...' : 'Apply Coins'}
+                {actionLoading ? 'Saving...' : adjustAmount < 0 ? `Minus ${Math.abs(adjustAmount)} Coins` : `Add ${adjustAmount} Coins`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK AUTO-ADD COINS & REFERRALS TO DEMO USERS MODAL */}
+      {showBulkAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs">
+          <div className="bg-[#0E1524] text-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-purple-500/40 relative">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center font-bold">
+                  <Bot className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-display font-black text-lg text-white leading-tight">
+                    Auto-Boost ALL Demo Users
+                  </h3>
+                  <p className="text-[11px] text-purple-300 font-medium">Sare demo accounts me coins &amp; referrals auto add karein</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkAddModal(false)}
+                className="text-slate-400 hover:text-white text-sm font-bold p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 my-4">
+              {/* Coins Min-Max Range */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Random Coins Range (Min to Max)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block mb-1">Min Coins:</span>
+                    <input
+                      type="number"
+                      value={minCoins}
+                      onChange={(e) => setMinCoins(Number(e.target.value))}
+                      placeholder="e.g. 2000"
+                      className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold text-amber-400 focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block mb-1">Max Coins:</span>
+                    <input
+                      type="number"
+                      value={maxCoins}
+                      onChange={(e) => setMaxCoins(Number(e.target.value))}
+                      placeholder="e.g. 6000"
+                      className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold text-amber-400 focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Referrals Min-Max Range */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Random Referrals Range (Min to Max)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block mb-1">Min Referrals:</span>
+                    <input
+                      type="number"
+                      value={minRefs}
+                      onChange={(e) => setMinRefs(Number(e.target.value))}
+                      placeholder="e.g. 3"
+                      className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold text-purple-300 focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold block mb-1">Max Referrals:</span>
+                    <input
+                      type="number"
+                      value={maxRefs}
+                      onChange={(e) => setMaxRefs(Number(e.target.value))}
+                      placeholder="e.g. 20"
+                      className="w-full px-3 py-2 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-bold text-purple-300 focus:border-purple-400 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Range Presets */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 block mb-1.5">
+                  Quick Min-Max Range Presets:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setMinCoins(2000); setMaxCoins(6000); setMinRefs(3); setMaxRefs(15); }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 rounded-xl text-center cursor-pointer transition-all active:scale-95"
+                  >
+                    <div className="text-xs font-black text-amber-300">2,000 to 6,000</div>
+                    <div className="text-[10px] text-purple-300 font-bold">(Random Coins)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setMinCoins(5000); setMaxCoins(15000); setMinRefs(10); setMaxRefs(35); }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 rounded-xl text-center cursor-pointer transition-all active:scale-95"
+                  >
+                    <div className="text-xs font-black text-amber-300">5,000 to 15,000</div>
+                    <div className="text-[10px] text-purple-300 font-bold">(Random Coins)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setMinCoins(10000); setMaxCoins(35000); setMinRefs(20); setMaxRefs(60); }}
+                    className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 rounded-xl text-center cursor-pointer transition-all active:scale-95"
+                  >
+                    <div className="text-xs font-black text-amber-300">10,000 to 35,000</div>
+                    <div className="text-[10px] text-purple-300 font-bold">(Random Coins)</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl text-[11px] text-purple-200 font-medium mb-4">
+              🎲 Har demo user ko <strong>{minCoins.toLocaleString()} se {maxCoins.toLocaleString()} Coins</strong> aur <strong>{minRefs} se {maxRefs} Referrals</strong> ke beech bilkul unique, random point milega (e.g. 2340, 5890, 3415, 4980, 2150, 5625...).
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkAddModal(false)}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmBulkAdd}
+                disabled={bulkActionLoading}
+                className="flex-1 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-black rounded-xl text-xs shadow-md transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {bulkActionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300 stroke-[3]" />
+                    <span>🚀 Boost Demo Users</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

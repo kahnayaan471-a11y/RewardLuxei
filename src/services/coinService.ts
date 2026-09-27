@@ -58,14 +58,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 // Calculate required completed tasks for any withdrawal amount (₹10 = 1 task, ₹20 = 2 tasks, ₹50 = 5 tasks)
 export function calculateRequiredTasksForWithdrawal(inrAmount: number, userOverride?: number): number {
-  if (userOverride === 0) return 0; // Admin override 0 exempts user
-  // If user has a custom override set by admin (e.g. 1, 2, 3 tasks)
-  if (userOverride !== undefined && userOverride > 0) {
-    const amountTier = Math.max(1, Math.floor(inrAmount / 10));
-    return Math.max(userOverride, amountTier);
-  }
   // Standard rule: 1 task per ₹10 (e.g. ₹10 -> 1 task, ₹20 -> 2 tasks, ₹50 -> 5 tasks, ₹100 -> 10 tasks)
-  return Math.max(1, Math.floor(inrAmount / 10));
+  const baseRequired = Math.max(1, Math.floor(inrAmount / 10));
+  if (userOverride !== undefined && userOverride > baseRequired) {
+    return userOverride;
+  }
+  return baseRequired;
 }
 
 // Get user's available completed tasks that have not been consumed by previous withdrawals
@@ -1292,7 +1290,7 @@ export async function deleteAllAdminWithdrawals(withdrawalIds?: string[]): Promi
   return count;
 }
 
-// Admin: Adjust User Coins
+// Admin: Adjust User Coins (Add or Minus)
 export async function adminAdjustUserCoins(
   userId: string,
   amount: number,
@@ -1302,18 +1300,47 @@ export async function adminAdjustUserCoins(
   const userDoc = await getDoc(userRef);
   if (!userDoc.exists()) throw new Error('User not found');
 
+  const userData = userDoc.data() as UserProfile;
+  const currentCoins = userData.coins || 0;
+  const newCoins = Math.max(0, currentCoins + amount);
+
   await updateDoc(userRef, {
-    coins: increment(amount),
-    totalEarned: amount > 0 ? increment(amount) : increment(0)
+    coins: newCoins,
+    totalEarned: amount > 0 ? increment(amount) : (userData.totalEarned || 0)
   });
 
   await addDoc(collection(db, 'transactions'), {
     userId,
     type: 'admin_adjustment',
     amount,
-    description: `Admin adjustment: ${reason}`,
+    description: `Admin adjustment: ${reason || (amount < 0 ? 'Coins deducted/minused by admin' : 'Bonus coins added by admin')}`,
     timestamp: Date.now()
   });
+
+  // Update local cached profile if present
+  const cached = getCachedProfile(userId);
+  if (cached) {
+    cached.coins = newCoins;
+    if (amount > 0) {
+      cached.totalEarned = (cached.totalEarned || 0) + amount;
+    }
+    setCachedProfile(userId, cached);
+  }
+
+  // Dispatch optimistic UI event across the application
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('coin_balance_updated', {
+        detail: {
+          userId,
+          amount,
+          type: 'admin_adjustment',
+          newBalance: newCoins,
+          timestamp: Date.now()
+        }
+      })
+    );
+  }
 }
 
 // Admin: Adjust User Referral Count (Add or Deduct/Minus Referrals)
@@ -1393,6 +1420,86 @@ export async function adminAdjustUserReferrals(
   }
 
   return { success: true, newReferralCount: newRefs };
+}
+
+// Admin: Set Random Coins & Referrals in a Min-Max Range ONLY to Demo Users (e.g. 2000 to 6000)
+export async function adminBulkAddCoinsAndReferralsToDemoUsers(
+  minCoins: number = 2000,
+  maxCoins: number = 6000,
+  minReferrals: number = 3,
+  maxReferrals: number = 20
+): Promise<{ success: boolean; totalUpdated: number }> {
+  let count = 0;
+  const safeMinCoins = Math.min(minCoins, maxCoins);
+  const safeMaxCoins = Math.max(minCoins, maxCoins);
+  const safeMinRefs = Math.min(minReferrals, maxReferrals);
+  const safeMaxRefs = Math.max(minReferrals, maxReferrals);
+
+  const getRandomCoins = () => Math.floor(Math.random() * (safeMaxCoins - safeMinCoins + 1)) + safeMinCoins;
+  const getRandomRefs = () => Math.floor(Math.random() * (safeMaxRefs - safeMinRefs + 1)) + safeMinRefs;
+
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const batch = writeBatch(db);
+
+    usersSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfile;
+      const isDemo = docSnap.id.startsWith('demo_') || (data.uid && data.uid.startsWith('demo_'));
+
+      if (isDemo) {
+        const userRef = doc(db, 'users', docSnap.id);
+        const assignedCoins = getRandomCoins();
+        const assignedRefs = getRandomRefs();
+
+        const updates: Record<string, unknown> = {
+          coins: assignedCoins,
+          totalEarned: Math.max(assignedCoins, data.totalEarned || 0),
+          referralCount: assignedRefs,
+          updatedAt: Date.now()
+        };
+
+        batch.update(userRef, updates);
+        count++;
+
+        // Update local cached profile
+        const cached = getCachedProfile(docSnap.id);
+        if (cached) {
+          cached.coins = assignedCoins;
+          cached.totalEarned = Math.max(assignedCoins, cached.totalEarned || 0);
+          cached.referralCount = assignedRefs;
+          setCachedProfile(docSnap.id, cached);
+        }
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    // Also update ALL_DEMO_USERS in-memory array with random numbers in range
+    if (Array.isArray(ALL_DEMO_USERS)) {
+      ALL_DEMO_USERS.forEach((d) => {
+        const assignedCoins = getRandomCoins();
+        const assignedRefs = getRandomRefs();
+        d.coins = assignedCoins;
+        d.totalEarned = Math.max(assignedCoins, d.totalEarned || 0);
+        d.referralCount = assignedRefs;
+      });
+    }
+
+    // Dispatch global balance update event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('coin_balance_updated', {
+          detail: { timestamp: Date.now() }
+        })
+      );
+    }
+  } catch (err) {
+    console.warn('Demo users random range bulk update error:', err);
+  }
+
+  return { success: true, totalUpdated: count || ALL_DEMO_USERS.length };
 }
 
 // Admin: Ban/Unban User
