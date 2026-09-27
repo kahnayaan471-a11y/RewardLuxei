@@ -1166,9 +1166,6 @@ export async function submitWithdrawalRequest(
     const withRef = doc(collection(db, 'withdrawals'));
     withdrawalId = withRef.id;
 
-    // Auto-generate Google Play Redeem code if method is google_play
-    const autoRedeemCode = method === 'google_play' ? generateGooglePlayRedeemCode() : undefined;
-
     // Capture client network info and device ID for withdrawal auditing & anti-fraud
     const netInfo = getCachedClientNetworkInfo();
 
@@ -1186,7 +1183,7 @@ export async function submitWithdrawalRequest(
       ipAddress: netInfo.ip || '127.0.0.1',
       networkType: netInfo.networkType || '4G/Wi-Fi',
       deviceId: netInfo.deviceId,
-      ...(autoRedeemCode ? { redeemCode: autoRedeemCode } : {}),
+      redeemCode: '', // Admin will manually enter and assign gift card code upon approval
       createdAt: Date.now(),
       updatedAt: Date.now()
     };

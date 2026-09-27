@@ -15,7 +15,7 @@ const updateSW = registerSW({
 });
 
 // Fallback direct Service Worker registration for static environments (Netlify, WebView)
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+if ('serviceWorker' in navigator && (import.meta.env.PROD || !import.meta.env.DEV)) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.warn('SW registration skipped or managed by VitePWA:', err);

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { GoldCoin } from './GoldCoin';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   DEFAULT_SETTINGS,
   getTodayDateString,
@@ -227,6 +228,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onOpenTournament
 }) => {
   const { profile } = useAuth();
+  const { isDark } = useTheme();
   const [tasks, setTasks] = useState<AppTask[]>([]);
   const [userTaskProgress, setUserTaskProgress] = useState<Record<string, UserTaskStatus>>({});
   const [giveawayConfig, setGiveawayConfig] = useState<GiveawayConfig | null>(null);
@@ -295,7 +297,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shadow-inner">
                 <GoldCoin className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-200">
                 Wallet Balance
               </span>
             </div>
@@ -303,7 +305,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             {/* Streak Badge Box */}
             <button
               onClick={onOpenCheckIn}
-              className="flex items-center gap-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 px-3 py-1 rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 bg-orange-500/30 hover:bg-orange-500/40 text-orange-200 border border-orange-500/50 px-3 py-1 rounded-xl text-xs font-black transition-all active:scale-95 shadow-sm cursor-pointer"
             >
               <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
               <span>{activeStreak} Day Streak</span>
@@ -315,19 +317,23 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
             <div>
               <div className="flex items-baseline gap-2">
                 <GoldCoin className="w-8 h-8 sm:w-10 sm:h-10 self-center" />
-                <span className="font-display font-black text-4xl sm:text-5xl tracking-tight text-white">
+                <span className="font-display font-black text-4xl sm:text-5xl tracking-tight text-white drop-shadow-sm">
                   {(profile?.coins || 0).toLocaleString()}
                 </span>
-                <span className="text-amber-400 font-display font-bold text-lg">Coins</span>
+                <span className="text-amber-400 font-display font-black text-lg">Coins</span>
               </div>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Real Cash: <strong className="text-emerald-400 font-bold">₹{((profile?.coins || 0) / 100).toFixed(2)}</strong> (100 Coins = ₹1 INR)
+              <p className="text-xs text-slate-200 font-semibold mt-1 flex items-center gap-1.5 flex-wrap">
+                <span>Real Cash:</span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-lg font-black text-xs">
+                  ₹{((profile?.coins || 0) / 100).toFixed(2)}
+                </span>
+                <span className="text-slate-400 font-normal">(100 Coins = ₹1 INR)</span>
               </p>
             </div>
 
             <button
               onClick={onOpenWithdraw}
-              className="px-5 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-display font-black text-sm rounded-2xl shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all"
+              className="px-5 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 font-display font-black text-sm rounded-2xl shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
             >
               <CreditCard className="w-4 h-4" />
               <span>Withdraw Cash</span>
@@ -339,8 +345,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
       {/* 2. Main Play & Earn Arena: 2x2 Interactive Grid Boxes */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h3 className="font-display font-black text-base sm:text-lg text-slate-900 flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center font-bold">
+          <h3 className={`font-display font-black text-base sm:text-lg flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold">
               <Zap className="w-4 h-4 fill-amber-500" />
             </div>
             <span>Play &amp; Earn Games</span>

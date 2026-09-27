@@ -19,7 +19,11 @@ import {
   ExternalLink,
   KeyRound,
   ArrowLeft,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  Unlock,
+  Sparkles,
+  ListTodo
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
@@ -45,10 +49,12 @@ interface WithdrawModalProps {
 const PRESET_AMOUNTS = [
   { inr: 10, coins: 1000 },
   { inr: 20, coins: 2000 },
+  { inr: 30, coins: 3000 },
   { inr: 50, coins: 5000 },
   { inr: 100, coins: 10000 },
   { inr: 250, coins: 25000 },
   { inr: 500, coins: 50000 },
+  { inr: 1000, coins: 100000 },
 ];
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, onOpenAuth, onOpenTasks }) => {
@@ -106,10 +112,8 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
   };
 
   const getRedeemCodeForItem = (item: WithdrawalRequest) => {
-    if (item.redeemCode) return item.redeemCode;
-    if (item.method === 'google_play') {
-      const idPart = (item.id || 'GP').slice(-4).toUpperCase().padEnd(4, 'X');
-      return `GPLAY-8F92-${idPart}-PQ9Z`;
+    if (item.status === 'approved' && item.redeemCode) {
+      return item.redeemCode.trim();
     }
     return '';
   };
@@ -355,18 +359,22 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                 <label className="text-xs font-bold text-amber-400/90 uppercase tracking-wider block">
                   Select Cashout Amount
                 </label>
+                <span className="text-[11px] text-amber-300/80 font-bold flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                  <GoldCoin size={12} /> 100 Coins = ₹1
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {PRESET_AMOUNTS.map((preset, idx) => {
                   const isSelected = selectedInr === preset.inr;
                   const canAfford = userCoins >= preset.coins;
+                  const presetReqTasks = calculateRequiredTasksForWithdrawal(preset.inr, profile?.requiredTasksForWithdrawal);
 
                   return (
                     <button
                       key={`preset-${preset.inr}-${preset.coins}-${idx}`}
                       type="button"
                       onClick={() => setSelectedInr(preset.inr)}
-                      className={`p-3 rounded-2xl border text-center transition-all cursor-pointer relative ${
+                      className={`p-2.5 sm:p-3 rounded-2xl border text-center transition-all cursor-pointer relative flex flex-col items-center justify-center ${
                         isSelected
                           ? 'border-amber-400 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black shadow-lg shadow-amber-500/25'
                           : canAfford
@@ -374,15 +382,103 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                           : 'border-slate-800 bg-slate-950/40 text-slate-500 font-medium'
                       }`}
                     >
-                      <div className="text-base font-display">₹{preset.inr}</div>
-                      <div className={`text-[10px] ${isSelected ? 'text-slate-950 font-bold' : canAfford ? 'text-amber-400/90' : 'text-slate-500'}`}>
-                        {preset.coins.toLocaleString()} Coins
+                      <div className="text-base font-display font-black">₹{preset.inr}</div>
+                      <div className={`text-[10px] flex items-center justify-center gap-1 mt-0.5 ${isSelected ? 'text-slate-950 font-black' : canAfford ? 'text-amber-400/90 font-bold' : 'text-slate-500'}`}>
+                        <GoldCoin size={11} />
+                        <span>{preset.coins.toLocaleString()}</span>
                       </div>
+                      {presetReqTasks > 0 && (
+                        <div className={`text-[9px] mt-1 font-extrabold px-1.5 py-0.5 rounded-md ${
+                          isSelected ? 'bg-slate-950/20 text-slate-900 font-black' : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        }`}>
+                          📋 {presetReqTasks} {presetReqTasks === 1 ? 'Task' : 'Tasks'}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
+
+              {/* Coin Deduction Summary Bar */}
+              <div className="mt-3 p-3 bg-slate-950/90 border border-slate-800 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                    <GoldCoin size={18} />
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-[10px]">Coins Required:</div>
+                    <div className="font-black text-amber-300 flex items-center gap-1">
+                      <span>{requiredCoins.toLocaleString()} Coins</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(= ₹{selectedInr})</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-slate-400 text-[10px]">Remaining Balance:</div>
+                  <div className={`font-black ${hasEnoughCoins ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {hasEnoughCoins ? `${(userCoins - requiredCoins).toLocaleString()} Coins` : `Need ${(requiredCoins - userCoins).toLocaleString()} more`}
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Task Lock Status Box (Only shown when task lock is active and withdrawal is locked) */}
+            {isTaskLocked && requiredTasks > 0 && (
+              <div className="p-4 rounded-2xl border transition-all bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/60 border-amber-500/50 shadow-lg shadow-amber-500/10">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-extrabold tracking-wide uppercase text-slate-200 flex items-center gap-1.5">
+                        <span>Withdrawal Task Lock Status</span>
+                        <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-md font-black">
+                          🔒 Locked
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-medium">
+                        ₹{selectedInr} payout ke liye mandatory task requirement: {requiredTasks} {requiredTasks === 1 ? 'Task' : 'Tasks'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-black font-mono text-amber-300 bg-black/40 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                      {availableTasks} / {requiredTasks} Task{requiredTasks !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Task Progress Bar */}
+                <div className="mt-2 space-y-1.5">
+                  <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-slate-800 p-0.5">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-amber-500 to-yellow-400"
+                      style={{ width: `${taskProgressPercent}%` }}
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+                    <p className="text-[11px] text-amber-200/90 font-semibold leading-snug">
+                      ⚠️ Withdrawal unlock karne ke liye <strong>{tasksMissing} task</strong> aur complete karein!
+                    </p>
+
+                    {onOpenTasks && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenTasks()}
+                        className="px-3.5 py-2 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                      >
+                        <ListTodo className="w-3.5 h-3.5" />
+                        <span>Complete {tasksMissing} Task Now</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Method Specific Details Input */}
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
@@ -487,6 +583,8 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                 className={`w-full py-3.5 px-4 rounded-2xl font-display font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer ${
                   !hasEnoughCoins
                     ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                    : isTaskLocked
+                    ? 'bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-600 hover:to-rose-700 text-white shadow-rose-500/20'
                     : 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 shadow-amber-500/25'
                 }`}
               >
@@ -494,6 +592,11 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                   <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 ) : !hasEnoughCoins ? (
                   <span>Insufficient Coins (Need {requiredCoins - userCoins} more)</span>
+                ) : isTaskLocked ? (
+                  <>
+                    <Lock className="w-4 h-4 text-amber-200 shrink-0" />
+                    <span>Complete {requiredTasks} {requiredTasks === 1 ? 'Task' : 'Tasks'} to Unlock Withdrawal</span>
+                  </>
                 ) : (
                   <>
                     <span>Withdraw ₹{selectedInr} ({requiredCoins.toLocaleString()} Coins)</span>
@@ -595,8 +698,16 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                       </span>
                     </div>
 
-                    {/* Google Play Redeem Code Card */}
-                    {isGooglePlay && itemRedeemCode && (
+                    {/* Google Play Pending Review Notice */}
+                    {item.method === 'google_play' && item.status === 'pending' && (
+                      <div className="my-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 font-medium flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Admin review pending: Admin request approve karke ₹{item.inrAmount} Gift Card redeem code yahan issue karega.</span>
+                      </div>
+                    )}
+
+                    {/* Google Play Redeem Code Card (Shown ONLY when approved and redeem code provided by admin) */}
+                    {item.status === 'approved' && itemRedeemCode && (
                       <div className="my-3 p-3.5 bg-black/50 rounded-xl border border-emerald-500/40 space-y-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">

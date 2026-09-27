@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Header } from './components/Header';
 import { LivePayoutTicker } from './components/LivePayoutTicker';
 import { Navigation, TabType } from './components/Navigation';
@@ -46,6 +47,7 @@ export const checkIsAdminPath = () => {
 
 const MainApp: React.FC = () => {
   const { profile, isAdmin, loading, logout } = useAuth();
+  const { isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [leaderboardInitialTab, setLeaderboardInitialTab] = useState<'coins' | 'referrals'>('coins');
@@ -125,7 +127,7 @@ const MainApp: React.FC = () => {
 
   // 2. USER PANEL (/) -> Exclusively for Players
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-amber-500 selection:text-white">
+    <div className={`min-h-screen ${isDark ? 'bg-[#070A12] text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col selection:bg-amber-500 selection:text-white transition-colors duration-200`}>
       {/* Top Header */}
       <Header
         onOpenWithdraw={() => setIsWithdrawOpen(true)}
@@ -376,8 +378,10 @@ const MainApp: React.FC = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -36,9 +36,12 @@ import {
   Search,
   Share2,
   Percent,
-  Trophy
+  Trophy,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { CoinTransaction, UserReferralHistoryData } from '../types';
 import {
   fetchUserTransactions,
@@ -84,6 +87,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenTasks
 }) => {
   const { profile, currentUser, logout } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [currentSubPage, setCurrentSubPage] = useState<ProfileSubPage>(initialSubPage);
 
   useEffect(() => {
@@ -205,14 +209,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (!currentUser || !profile) {
     return (
-      <div className="bg-white rounded-3xl p-8 text-center max-w-md mx-auto shadow-xl border border-slate-100 my-8">
-        <div className="w-16 h-16 rounded-3xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center max-w-md mx-auto shadow-xl border border-slate-100 dark:border-slate-800 my-8">
+        <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-3">
           <User className="w-8 h-8" />
         </div>
-        <h3 className="font-display font-black text-xl text-slate-900">
+        <h3 className="font-display font-black text-xl text-slate-900 dark:text-white">
           Account Not Logged In
         </h3>
-        <p className="text-xs text-slate-700 mt-1 mb-6">
+        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 mb-6">
           Log in or create an account to view your coins, rank, and withdrawal history.
         </p>
         <button
@@ -260,19 +264,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setCurrentSubPage('main')}
-                  className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                  className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                  <h2 className="font-display font-black text-lg text-slate-900">
+                  <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">
                     Coin Transaction History
                   </h2>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Track all coin credits, debits & rewards
                   </p>
                 </div>
@@ -281,7 +285,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <button
                 onClick={loadTransactions}
                 disabled={loadingTxns}
-                className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 hover:bg-amber-100 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 flex items-center justify-center text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 active:scale-95 transition-all"
                 title="Refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${loadingTxns ? 'animate-spin' : ''}`} />
@@ -290,34 +294,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* Quick Stat Bar */}
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-amber-50/90 rounded-2xl p-3 border border-amber-200/80 text-center">
-                <span className="text-[10px] uppercase font-bold text-amber-800">Current Balance</span>
-                <div className="font-display font-black text-base text-slate-900 mt-0.5">
+              <div className="bg-amber-50/90 dark:bg-amber-950/40 rounded-2xl p-3 border border-amber-200/80 dark:border-amber-800/40 text-center">
+                <span className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-300">Current Balance</span>
+                <div className="font-display font-black text-base text-slate-900 dark:text-amber-200 mt-0.5">
                   {(profile.coins || 0).toLocaleString()}
                 </div>
               </div>
-              <div className="bg-emerald-50/90 rounded-2xl p-3 border border-emerald-200/80 text-center">
-                <span className="text-[10px] uppercase font-bold text-emerald-800">Total Credits</span>
-                <div className="font-display font-black text-base text-emerald-700 mt-0.5">
+              <div className="bg-emerald-50/90 dark:bg-emerald-950/40 rounded-2xl p-3 border border-emerald-200/80 dark:border-emerald-800/40 text-center">
+                <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-300">Total Credits</span>
+                <div className="font-display font-black text-base text-emerald-700 dark:text-emerald-400 mt-0.5">
                   +{(totalEarnedTxns || profile.totalEarned || profile.coins || 0).toLocaleString()}
                 </div>
               </div>
-              <div className="bg-rose-50/90 rounded-2xl p-3 border border-rose-200/80 text-center">
-                <span className="text-[10px] uppercase font-bold text-rose-800">Total Debits</span>
-                <div className="font-display font-black text-base text-rose-700 mt-0.5">
+              <div className="bg-rose-50/90 dark:bg-rose-950/40 rounded-2xl p-3 border border-rose-200/80 dark:border-rose-800/40 text-center">
+                <span className="text-[10px] uppercase font-bold text-rose-800 dark:text-rose-300">Total Debits</span>
+                <div className="font-display font-black text-base text-rose-700 dark:text-rose-400 mt-0.5">
                   -{totalSpentTxns.toLocaleString()}
                 </div>
               </div>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex bg-slate-200/70 p-1 rounded-2xl gap-1 text-xs font-bold">
+            <div className="flex bg-slate-200/70 dark:bg-slate-800 p-1 rounded-2xl gap-1 text-xs font-bold">
               <button
                 onClick={() => setHistoryFilter('all')}
                 className={`flex-1 py-2 rounded-xl transition-all ${
                   historyFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 All Records ({transactions.length})
@@ -327,7 +331,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 className={`flex-1 py-2 rounded-xl transition-all ${
                   historyFilter === 'earned'
                     ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 Credits Earned
@@ -337,7 +341,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 className={`flex-1 py-2 rounded-xl transition-all ${
                   historyFilter === 'spent'
                     ? 'bg-rose-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 Debits / Withdraw
@@ -345,22 +349,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Transaction List */}
-            <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               {loadingTxns ? (
                 <div className="py-12 text-center">
                   <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <span className="text-xs text-slate-500 font-medium">Fetching transactions...</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Fetching transactions...</span>
                 </div>
               ) : filteredTransactions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 space-y-2">
-                  <Coins className="w-10 h-10 text-slate-300 mx-auto" />
-                  <div className="text-sm font-bold text-slate-700">No transactions recorded yet</div>
-                  <div className="text-xs text-slate-500 max-w-xs mx-auto">
+                <div className="text-center py-12 text-slate-500 dark:text-slate-400 space-y-2">
+                  <Coins className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                  <div className="text-sm font-bold text-slate-700 dark:text-slate-200">No transactions recorded yet</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
                     Play games, spin the wheel, scratch cards, or refer friends to start earning coins!
                   </div>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredTransactions.map((txn, idx) => {
                     const isPositive = txn.amount > 0;
                     return (
@@ -368,7 +372,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 ${
-                              isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                              isPositive ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400'
                             }`}
                           >
                             {isPositive ? (
@@ -378,10 +382,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-xs sm:text-sm text-slate-900">
+                            <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
                               {txn.description}
                             </div>
-                            <div className="text-[10px] text-slate-500">
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
                               {new Date(txn.timestamp).toLocaleString()}
                             </div>
                           </div>
@@ -389,7 +393,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                         <div
                           className={`font-display font-black text-xs sm:text-sm flex-shrink-0 ${
-                            isPositive ? 'text-emerald-700' : 'text-rose-600'
+                            isPositive ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                           }`}
                         >
                           {isPositive ? `+${txn.amount}` : txn.amount} Coins
@@ -413,23 +417,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setCurrentSubPage('main')}
-                  className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                  className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div>
-                  <h2 className="font-display font-black text-slate-900 text-lg">Referral & Friends History</h2>
-                  <p className="text-[11px] text-slate-500">Track invited friends & earnings generated from each</p>
+                  <h2 className="font-display font-black text-slate-900 dark:text-white text-lg">Referral & Friends History</h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Track invited friends & earnings generated from each</p>
                 </div>
               </div>
               <button
                 onClick={loadReferralHistory}
                 disabled={loadingReferrals}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all disabled:opacity-50"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all disabled:opacity-50"
                 title="Refresh Referral History"
               >
                 <RefreshCw className={`w-4 h-4 ${loadingReferrals ? 'animate-spin' : ''}`} />
@@ -500,15 +504,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             {/* Summary Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {/* Metric 1: Total Invited */}
-              <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Friends</span>
-                  <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Friends</span>
+                  <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
                     <Users className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div>
-                  <div className="font-display font-black text-lg text-slate-900">
+                  <div className="font-display font-black text-lg text-slate-900 dark:text-white">
                     {Math.max(profile?.referralCount || 0, referralHistory.totalInvited || 0)}
                   </div>
                   <div className="text-[10px] text-slate-400">Total Joined</div>
@@ -516,15 +520,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               {/* Metric 2: Total Referral Earnings */}
-              <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Earned</span>
-                  <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Earned</span>
+                  <div className="w-7 h-7 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                     <Coins className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div>
-                  <div className="font-display font-black text-lg text-emerald-600">
+                  <div className="font-display font-black text-lg text-emerald-600 dark:text-emerald-400">
                     +{referralHistory.totalEarnings}
                   </div>
                   <div className="text-[10px] text-slate-400">
@@ -534,15 +538,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               {/* Metric 3: Direct Signup Bonus */}
-              <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Direct Bonus</span>
-                  <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Direct Bonus</span>
+                  <div className="w-7 h-7 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                     <Gift className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div>
-                  <div className="font-display font-black text-lg text-amber-600">
+                  <div className="font-display font-black text-lg text-amber-600 dark:text-amber-400">
                     +{referralHistory.signupBonusTotal}
                   </div>
                   <div className="text-[10px] text-slate-400">Signup Rewards</div>
@@ -550,15 +554,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               {/* Metric 4: 3% Commission */}
-              <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 flex flex-col justify-between">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3.5 shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">3% Passive</span>
-                  <div className="w-7 h-7 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">3% Passive</span>
+                  <div className="w-7 h-7 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5" />
                   </div>
                 </div>
                 <div>
-                  <div className="font-display font-black text-lg text-purple-600">
+                  <div className="font-display font-black text-lg text-purple-600 dark:text-purple-400">
                     +{referralHistory.commissionBonusTotal}
                   </div>
                   <div className="text-[10px] text-slate-400">Lifetime Comms</div>
@@ -625,16 +629,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
 
             {/* Invited Friends List Card */}
-            <div className="bg-white rounded-3xl p-5 shadow-xl border border-slate-100 space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-xl border border-slate-100 dark:border-slate-800 space-y-4 transition-colors">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
+                  <h3 className="font-display font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                     <span>Invited Friends List & Earnings</span>
-                    <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100">
+                    <span className="text-[10px] font-extrabold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800/40">
                       {referralHistory.friends.length} Friends
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">Earnings breakdown generated from each invited friend</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Earnings breakdown generated from each invited friend</p>
                 </div>
 
                 {referralHistory.friends.length > 3 && (
@@ -645,7 +649,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       placeholder="Search friends..."
                       value={refSearch}
                       onChange={(e) => setRefSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 dark:text-slate-200"
                     />
                   </div>
                 )}
@@ -657,13 +661,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <p className="text-xs">Loading invited friends history...</p>
                 </div>
               ) : referralHistory.friends.length === 0 ? (
-                <div className="py-10 text-center space-y-3 bg-slate-50/60 rounded-2xl border border-slate-100/80 p-6">
-                  <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                <div className="py-10 text-center space-y-3 bg-slate-50/60 dark:bg-slate-800/40 rounded-2xl border border-slate-100/80 dark:border-slate-800 p-6">
+                  <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-2xl mx-auto flex items-center justify-center">
                     <UserPlus className="w-7 h-7" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-slate-800">No Friends Invited Yet</h4>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">No Friends Invited Yet</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
                       Share your referral code with friends, classmates, and family. You'll earn 100 bonus coins instantly plus 3% lifetime earnings on all their activities!
                     </p>
                   </div>
@@ -676,7 +680,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {referralHistory.friends
                     .filter((f) =>
                       !refSearch ||
@@ -685,7 +689,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     .map((friend, idx) => (
                       <div
                         key={`friend-${friend.uid || 'anon'}-${idx}`}
-                        className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 rounded-2xl px-2 -mx-2 transition-colors"
+                        className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 rounded-2xl px-2 -mx-2 transition-colors"
                       >
                         {/* Friend Identity */}
                         <div className="flex items-center gap-3">
@@ -701,14 +705,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                            <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                               <span>{friend.displayName}</span>
                               {friend.isVerified && <VerifiedBadge size="sm" />}
-                              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.2 rounded">
+                              <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-bold px-1.5 py-0.2 rounded">
                                 Active
                               </span>
                             </div>
-                            <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
                               <span>Joined: {new Date(friend.joinedAt).toLocaleDateString()}</span>
                               {friend.friendTotalEarned !== undefined && friend.friendTotalEarned > 0 && (
                                 <>
@@ -722,23 +726,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                         {/* Earnings Generated Breakdown */}
                         <div className="flex flex-wrap sm:flex-nowrap items-center sm:justify-end gap-2 text-right">
-                          <div className="flex items-center gap-1.5 text-[10px] bg-amber-50 text-amber-800 font-semibold px-2 py-1 rounded-lg border border-amber-100">
-                            <Gift className="w-3 h-3 text-amber-600" />
+                          <div className="flex items-center gap-1.5 text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-semibold px-2 py-1 rounded-lg border border-amber-100 dark:border-amber-800/40">
+                            <Gift className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                             <span>Signup: +{friend.signupBonus}</span>
                           </div>
 
                           {friend.commissionEarned > 0 && (
-                            <div className="flex items-center gap-1.5 text-[10px] bg-purple-50 text-purple-800 font-semibold px-2 py-1 rounded-lg border border-purple-100">
-                              <TrendingUp className="w-3 h-3 text-purple-600" />
+                            <div className="flex items-center gap-1.5 text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 font-semibold px-2 py-1 rounded-lg border border-purple-100 dark:border-purple-800/40">
+                              <TrendingUp className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                               <span>3% Comms: +{friend.commissionEarned}</span>
                             </div>
                           )}
 
-                          <div className="bg-emerald-50/80 border border-emerald-100 px-2.5 py-1 rounded-xl text-right shrink-0">
-                            <div className="font-display font-black text-xs sm:text-sm text-emerald-700">
+                          <div className="bg-emerald-50/80 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/40 px-2.5 py-1 rounded-xl text-right shrink-0">
+                            <div className="font-display font-black text-xs sm:text-sm text-emerald-700 dark:text-emerald-400">
                               +{friend.coinsGenerated} Coins
                             </div>
-                            <div className="text-[9px] text-emerald-600 font-bold">
+                            <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">
                               ₹{(friend.coinsGenerated / DEFAULT_SETTINGS.coinsPerInr).toFixed(2)} total
                             </div>
                           </div>
@@ -779,31 +783,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header matching screenshot: AboutUs */}
-            <div className="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <button
                 onClick={() => setCurrentSubPage('main')}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="font-display font-black text-lg text-slate-900">AboutUs</h2>
-                <p className="text-[11px] text-slate-500">App Information &amp; Development Team</p>
+                <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">AboutUs</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">App Information &amp; Development Team</p>
               </div>
             </div>
 
             {/* Developed By Section Matching User Screenshot */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7] inline-block shadow-2xs shrink-0" />
-                <h3 className="font-display font-black text-lg text-slate-900 tracking-tight">
+                <h3 className="font-display font-black text-lg text-slate-900 dark:text-white tracking-tight">
                   Developed By
                 </h3>
               </div>
 
               <div className="space-y-3">
                 {/* Developer 1: llliiizz_aa / Md Sanaullah Amir (with custom Instagram DP and redirect) */}
-                <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#f8fafc] border border-slate-200/70 hover:border-sky-200 transition-all">
+                <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#f8fafc] dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 hover:border-sky-200 transition-all">
                   <div className="flex items-center gap-3.5 min-w-0 pr-2">
                     {/* Ring Avatar with uploaded image: https://iili.io/n2V9Vxj.jpg */}
                     <div className="w-13 h-13 rounded-full p-0.5 bg-gradient-to-tr from-sky-400 via-blue-300 to-sky-200 shadow-2xs shrink-0 flex items-center justify-center overflow-hidden">
@@ -816,7 +820,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </div>
                     <div className="min-w-0 truncate">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="font-display font-black text-base text-slate-900 tracking-tight truncate">
+                        <h4 className="font-display font-black text-base text-slate-900 dark:text-white tracking-tight truncate">
                           llliiizz_aa
                         </h4>
                         {/* Exact Official Instagram Scalloped Verified Badge */}
@@ -843,7 +847,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open Instagram Profile @llliiizz_aa"
-                    className="w-11 h-11 rounded-2xl bg-[#eef4ff] hover:bg-[#e0ecff] border border-[#d0e1fd] hover:border-pink-300 hover:shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-all group cursor-pointer"
+                    className="w-11 h-11 rounded-2xl bg-[#eef4ff] dark:bg-slate-700/80 hover:bg-[#e0ecff] dark:hover:bg-slate-700 border border-[#d0e1fd] dark:border-slate-600 hover:border-pink-300 hover:shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-all group cursor-pointer"
                   >
                     <svg
                       className="w-6 h-6 transform group-hover:scale-110 transition-transform"
@@ -867,7 +871,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
 
                 {/* Developer 2: _its_ibraheem___ (Direct User Uploaded Image URL) */}
-                <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#f8fafc] border border-slate-200/70 hover:border-sky-200 transition-all">
+                <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#f8fafc] dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 hover:border-sky-200 transition-all">
                   <div className="flex items-center gap-3.5 min-w-0 pr-2">
                     {/* Ring Avatar with uploaded image: https://iili.io/n2Ms0Qt.jpg */}
                     <div className="w-13 h-13 rounded-full p-0.5 bg-gradient-to-tr from-sky-400 via-blue-300 to-sky-200 shadow-2xs shrink-0 flex items-center justify-center overflow-hidden">
@@ -880,7 +884,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </div>
                     <div className="min-w-0 truncate">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="font-display font-black text-base text-slate-900 tracking-tight truncate">
+                        <h4 className="font-display font-black text-base text-slate-900 dark:text-white tracking-tight truncate">
                           _its_ibraheem___
                         </h4>
                         {/* Exact Official Instagram Scalloped Verified Badge */}
@@ -907,7 +911,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open Instagram Profile @_its_ibraheem___"
-                    className="w-11 h-11 rounded-2xl bg-[#eef4ff] hover:bg-[#e0ecff] border border-[#d0e1fd] hover:border-pink-300 hover:shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-all group cursor-pointer"
+                    className="w-11 h-11 rounded-2xl bg-[#eef4ff] dark:bg-slate-700/80 hover:bg-[#e0ecff] dark:hover:bg-slate-700 border border-[#d0e1fd] dark:border-slate-600 hover:border-pink-300 hover:shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-all group cursor-pointer"
                   >
                     <svg
                       className="w-6 h-6 transform group-hover:scale-110 transition-transform"
@@ -944,63 +948,63 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <button
                 onClick={() => setCurrentSubPage('main')}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="font-display font-black text-lg text-slate-900">How to Earn Coins</h2>
-                <p className="text-[11px] text-slate-500">Complete tasks & earn daily money</p>
+                <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">How to Earn Coins</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Complete tasks & earn daily money</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center font-black shrink-0">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start gap-3.5 transition-colors">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black shrink-0">
                   1
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Daily Spin Wheel (10 / Day)</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Daily Spin Wheel (10 / Day)</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                     Spin the lucky wheel everyday to win up to 250 coins per spin directly credited to your wallet.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center font-black shrink-0">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start gap-3.5 transition-colors">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-black shrink-0">
                   2
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Golden Scratch Cards (10 / Day)</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Golden Scratch Cards (10 / Day)</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                     Scratch interactive cards to reveal surprise coin jackpots of up to 400 coins.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-black shrink-0">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start gap-3.5 transition-colors">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black shrink-0">
                   3
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Fast Captcha Solver (20 / Day)</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Fast Captcha Solver (20 / Day)</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                     Solve high-speed captchas with special speed multiplier bonuses (+10 bonus for answers under 8 seconds).
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center font-black shrink-0">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex items-start gap-3.5 transition-colors">
+                <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black shrink-0">
                   4
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-900">Invite & Earn Program</h4>
-                  <p className="text-xs text-slate-600 mt-0.5">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Invite & Earn Program</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                     Get 100 coins for every invited friend + earn a 3% lifetime coin commission on all tasks your friend completes!
                   </p>
                 </div>
@@ -1019,44 +1023,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <button
                 onClick={() => setCurrentSubPage('main')}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="font-display font-black text-lg text-slate-900">Help & Support</h2>
-                <p className="text-[11px] text-slate-500">Frequently Asked Questions & Support Desk</p>
+                <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">Help & Support</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Frequently Asked Questions & Support Desk</p>
               </div>
             </div>
 
             {/* Quick Support & Contact Options */}
-            <div className="bg-white rounded-3xl p-3 shadow-xl border border-slate-100 divide-y divide-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-3 shadow-xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 transition-colors">
               {/* Live Chat with Bucksy */}
               {onOpenSupport && (
                 <button
                   onClick={onOpenSupport}
-                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-emerald-50/70 rounded-2xl transition-all text-left group cursor-pointer"
+                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 rounded-2xl transition-all text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <MessageCircle className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                      <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                         <span>Live Support Chat</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-extrabold px-2 py-0.5 rounded-full">
                           24/7 Live
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500">Live chat in Hindi &amp; English for tasks, coins &amp; payouts</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Live chat in Hindi &amp; English for tasks, coins &amp; payouts</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs">
+                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                     <span className="hidden sm:inline">Open Chat</span>
-                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                   </div>
                 </button>
               )}
@@ -1066,7 +1070,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 href="https://t.me/Websitename"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-sky-50/70 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-sky-50/70 dark:hover:bg-sky-950/30 rounded-2xl transition-all text-left group"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-[#229ED9]/15 text-[#229ED9] border border-[#229ED9]/30 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -1075,10 +1079,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </svg>
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">
                       Telegram Support
                     </div>
-                    <div className="text-[11px] text-slate-500">Official updates &amp; direct community help</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Official updates &amp; direct community help</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 text-[#229ED9] font-bold text-xs">
@@ -1089,35 +1093,35 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* FAQ Accordion */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-3">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-100 dark:border-slate-800 shadow-sm space-y-3 transition-colors">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-400">
                 Frequently Asked Questions
               </h4>
 
               <div className="space-y-2.5 text-xs">
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="font-bold text-slate-900 mb-1">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="font-bold text-slate-900 dark:text-white mb-1">
                     Q: How long does a withdrawal take to credit in UPI?
                   </div>
-                  <div className="text-slate-600">
+                  <div className="text-slate-600 dark:text-slate-300">
                     A: Standard UPI withdrawals are processed and credited within 2 to 24 hours after verification by our automated payout system.
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="font-bold text-slate-900 mb-1">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="font-bold text-slate-900 dark:text-white mb-1">
                     Q: When do daily spin and scratch card limits reset?
                   </div>
-                  <div className="text-slate-600">
+                  <div className="text-slate-600 dark:text-slate-300">
                     A: All daily limits reset automatically at 12:00 AM (Midnight) IST everyday.
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="font-bold text-slate-900 mb-1">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-100 dark:border-slate-700">
+                  <div className="font-bold text-slate-900 dark:text-white mb-1">
                     Q: Can I use multiple accounts on the same phone?
                   </div>
-                  <div className="text-slate-600">
+                  <div className="text-slate-600 dark:text-slate-300">
                     A: No. To prevent abuse, our fair play security rules restrict each physical device to one registered player account.
                   </div>
                 </div>
@@ -1136,36 +1140,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <button
                 onClick={() => setCurrentSubPage('main')}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="font-display font-black text-lg text-slate-900">Privacy Policy</h2>
-                <p className="text-[11px] text-slate-500">How we protect and handle your data</p>
+                <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">Privacy Policy</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">How we protect and handle your data</p>
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4 text-xs text-slate-600 leading-relaxed">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed transition-colors">
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">1. Information We Collect</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">1. Information We Collect</h4>
                 <p>
                   We collect your registered email address, player display name, gameplay transaction history, and provided payout details (UPI ID or Bank account info) exclusively for processing coin rewards.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">2. Data Security</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">2. Data Security</h4>
                 <p>
                   All credentials and transaction logs are stored in encrypted Google Cloud Firestore databases adhering to standard TLS 1.3 security encryption.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">3. Third-Party Sharing</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">3. Third-Party Sharing</h4>
                 <p>
                   Rewardluxe never sells or distributes player personal information to third-party marketing companies. Data is solely utilized for verification and payment processing.
                 </p>
@@ -1184,36 +1188,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Header */}
-            <div className="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 transition-colors">
               <button
                 onClick={() => setCurrentSubPage('main')}
-                className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 hover:bg-slate-200 active:scale-95 transition-all"
+                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <h2 className="font-display font-black text-lg text-slate-900">Terms & Conditions</h2>
-                <p className="text-[11px] text-slate-500">Rules & fair play guidelines</p>
+                <h2 className="font-display font-black text-lg text-slate-900 dark:text-white">Terms & Conditions</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Rules & fair play guidelines</p>
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4 text-xs text-slate-600 leading-relaxed">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed transition-colors">
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">1. Fair Play & Prohibited Actions</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">1. Fair Play & Prohibited Actions</h4>
                 <p>
                   Use of automated scripts, macro clickers, emulator farming, or artificial multiple referral rings is strictly prohibited. Violation will result in permanent account suspension and forfeiture of unwithdrawn balance.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">2. Withdrawal Criteria</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">2. Withdrawal Criteria</h4>
                 <p>
                   Withdrawals are subjected to the minimum redemption threshold (1,000 Coins / ₹10). Players must supply accurate payout details.
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 mb-1">3. Modifications</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-1">3. Modifications</h4>
                 <p>
                   Rewardluxe reserves the right to adjust reward limits, bonus multipliers, or terms with prior notification on the platform.
                 </p>
@@ -1232,7 +1236,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             className="space-y-4"
           >
             {/* Profile User Card */}
-            <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 relative overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 relative overflow-hidden transition-colors">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 {/* Clickable Profile Photo with Camera Badge */}
                 <div
@@ -1243,13 +1247,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <img
                     src={profile.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${profile.uid}`}
                     alt={profile.displayName}
-                    className="w-20 h-20 sm:w-22 sm:h-22 rounded-3xl bg-slate-100 border-2 border-amber-300 shadow-md object-cover transition-transform group-hover:scale-105"
+                    className="w-20 h-20 sm:w-22 sm:h-22 rounded-3xl bg-slate-100 dark:bg-slate-800 border-2 border-amber-300 shadow-md object-cover transition-transform group-hover:scale-105"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-slate-950/40 rounded-3xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                     <Camera className="w-6 h-6 drop-shadow-md" />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 bg-purple-600 hover:bg-purple-700 text-white p-1.5 rounded-full shadow-md border-2 border-white transition-all">
+                  <div className="absolute -bottom-1 -right-1 bg-purple-600 hover:bg-purple-700 text-white p-1.5 rounded-full shadow-md border-2 border-white dark:border-slate-900 transition-all">
                     <Camera className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -1257,23 +1261,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <div className="flex-1 text-center sm:text-left">
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
                     <div className="flex items-center gap-1.5">
-                      <h2 className="font-display font-black text-xl text-slate-900">
+                      <h2 className="font-display font-black text-xl text-slate-900 dark:text-white">
                         {profile.displayName || 'Player'}
                       </h2>
                       {profile.isVerified && <VerifiedBadge size="md" />}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-700 font-medium mb-2.5">
+                  <div className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-medium mb-2.5">
                     <Mail className="w-3.5 h-3.5" />
                     <span>{profile.email}</span>
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-3">
-                    <span className="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-xl font-bold">
-                      Referral Code: <strong className="text-slate-900">{profile.referralCode}</strong>
+                    <span className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-xl font-bold">
+                      Referral Code: <strong className="text-slate-900 dark:text-amber-300">{profile.referralCode}</strong>
                     </span>
-                    <span className="text-[11px] bg-orange-50 text-orange-600 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1">
+                    <span className="text-[11px] bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/50 dark:border-orange-900/50 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1">
                       <Flame className="w-3 h-3" />
                       Streak: {activeStreak}d
                     </span>
@@ -1283,9 +1287,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <div className="flex justify-center sm:justify-start">
                     <button
                       onClick={() => setShowAvatarModal(true)}
-                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 border border-purple-200/80 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 hover:from-purple-100 hover:to-indigo-100 dark:hover:from-purple-900/40 dark:hover:to-indigo-900/40 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
                     >
-                      <Camera className="w-3.5 h-3.5 text-purple-600" />
+                      <Camera className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                       <span>Upload Gallery Photo / Avatar</span>
                     </button>
                   </div>
@@ -1293,31 +1297,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               {/* Coin & Cash Metric Summary */}
-              <div className="grid grid-cols-3 gap-2.5 mt-6 pt-6 border-t border-slate-100 text-center">
-                <div className="bg-amber-50/80 rounded-2xl p-3 border border-amber-200">
-                  <span className="text-[10px] uppercase font-bold text-amber-800">Current Coins</span>
-                  <div className="font-display font-black text-lg text-slate-900 mt-0.5">
+              <div className="grid grid-cols-3 gap-2.5 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+                <div className="bg-amber-50/80 dark:bg-amber-950/40 rounded-2xl p-3 border border-amber-200 dark:border-amber-800/40">
+                  <span className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-300">Current Coins</span>
+                  <div className="font-display font-black text-lg text-slate-900 dark:text-amber-200 mt-0.5">
                     {(profile.coins || 0).toLocaleString()}
                   </div>
-                  <span className="text-[10px] text-amber-700 font-bold">
+                  <span className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">
                     ₹{((profile.coins || 0) / 100).toFixed(1)}
                   </span>
                 </div>
 
-                <div className="bg-emerald-50/80 rounded-2xl p-3 border border-emerald-200">
-                  <span className="text-[10px] uppercase font-bold text-emerald-800">Total Earned</span>
-                  <div className="font-display font-black text-lg text-slate-900 mt-0.5">
+                <div className="bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl p-3 border border-emerald-200 dark:border-emerald-800/40">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800 dark:text-emerald-300">Total Earned</span>
+                  <div className="font-display font-black text-lg text-slate-900 dark:text-emerald-200 mt-0.5">
                     {(profile.totalEarned || profile.coins || 0).toLocaleString()}
                   </div>
-                  <span className="text-[10px] text-emerald-700 font-bold">Coins</span>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Coins</span>
                 </div>
 
-                <div className="bg-purple-50/80 rounded-2xl p-3 border border-purple-200">
-                  <span className="text-[10px] uppercase font-bold text-purple-800">Total Withdrawn</span>
-                  <div className="font-display font-black text-lg text-slate-900 mt-0.5">
+                <div className="bg-purple-50/80 dark:bg-purple-950/40 rounded-2xl p-3 border border-purple-200 dark:border-purple-800/40">
+                  <span className="text-[10px] uppercase font-bold text-purple-800 dark:text-purple-300">Total Withdrawn</span>
+                  <div className="font-display font-black text-lg text-slate-900 dark:text-purple-200 mt-0.5">
                     ₹{profile.totalWithdrawn || 0}
                   </div>
-                  <span className="text-[10px] text-purple-700 font-bold">Cash</span>
+                  <span className="text-[10px] text-purple-700 dark:text-purple-400 font-bold">Cash</span>
                 </div>
               </div>
 
@@ -1325,7 +1329,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <button
                   onClick={onOpenWithdraw}
-                  className="py-3 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-extrabold rounded-2xl text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                  className="py-3 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-extrabold rounded-2xl text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                 >
                   <CreditCard className="w-4 h-4" />
                   <span>Withdraw Money</span>
@@ -1333,7 +1337,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                 <button
                   onClick={onOpenCheckIn}
-                  className="py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                  className="py-3 px-4 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white font-extrabold rounded-2xl text-xs shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
                 >
                   <Flame className="w-4 h-4 text-orange-400" />
                   <span>Daily Check-In</span>
@@ -1342,27 +1346,65 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Profile Options List (Direct Navigation) */}
-            <div className="bg-white rounded-3xl p-3 shadow-xl border border-slate-100 divide-y divide-slate-100">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-3 shadow-xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 transition-colors">
+              {/* Option: Dark / White Theme Toggle Switch (Only in Profile) */}
+              <div className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-10 h-10 rounded-2xl ${isDark ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/30' : 'bg-amber-50 text-amber-500 border border-amber-200/60'} flex items-center justify-center transition-colors shrink-0`}>
+                    {isDark ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>App Theme</span>
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${isDark ? 'bg-indigo-900/60 text-indigo-300 border border-indigo-500/30' : 'bg-amber-100 text-amber-800'}`}>
+                        {isDark ? 'Dark Mode 🌙' : 'Light Mode ☀️'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {isDark ? 'Dark mode enabled for comfortable viewing' : 'Clean white theme active'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive Toggle Switch */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  aria-label="Toggle Dark and Light theme"
+                  className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isDark ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out flex items-center justify-center text-[10px] ${
+                      isDark ? 'translate-x-6 bg-slate-900 text-amber-400' : 'translate-x-0 text-amber-500'
+                    }`}
+                  >
+                    {isDark ? <Moon className="w-3.5 h-3.5 text-indigo-400" /> : <Sun className="w-3.5 h-3.5 text-amber-500" />}
+                  </span>
+                </button>
+              </div>
+
               {/* Option 0: Refer Prize Pool (New Feature) */}
               <button
                 onClick={() => setCurrentSubPage('refer_prize_pool')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-amber-50/60 rounded-2xl transition-all text-left group cursor-pointer"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-amber-50/60 dark:hover:bg-amber-950/30 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 text-slate-950 font-black flex items-center justify-center group-hover:scale-105 shadow-md shadow-amber-500/25 transition-transform shrink-0">
                     <Trophy className="w-5 h-5 text-slate-950" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">
                       Refer Prize Pool
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-lg hidden sm:inline">
+                  <span className="text-[10px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/40 px-2 py-0.5 rounded-lg hidden sm:inline">
                     Win Big
                   </span>
-                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
                 </div>
               </button>
 
@@ -1372,111 +1414,111 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   setCurrentSubPage('referral_history');
                   loadReferralHistory();
                 }}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">
                       Referral &amp; Friends History
                     </div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 2: Coin History */}
               <button
                 onClick={() => setCurrentSubPage('coin_history')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group cursor-pointer"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <History className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">Coin History</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">Coin History</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 2.5: Task History & Completed Tasks */}
               {onOpenTasks && (
                 <button
                   onClick={() => onOpenTasks('history')}
-                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group cursor-pointer"
+                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <CheckCircle2 className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="font-bold text-sm text-slate-900">
+                      <div className="font-bold text-sm text-slate-900 dark:text-white">
                         Task History
                       </div>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
                 </button>
               )}
 
               {/* Option 3: How to Earn */}
               <button
                 onClick={() => setCurrentSubPage('how_to_earn')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Zap className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">How to Earn</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">How to Earn</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 3: About Us / About App */}
               <button
                 onClick={() => setCurrentSubPage('about')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Info className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">About App</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">About App</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 4: Live Support Chat (Bucksy) */}
               {onOpenSupport && (
                 <button
                   onClick={onOpenSupport}
-                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-emerald-50/70 rounded-2xl transition-all text-left group cursor-pointer"
+                  className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-emerald-50/70 dark:hover:bg-emerald-950/30 rounded-2xl transition-all text-left group cursor-pointer"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                       <MessageCircle className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                      <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                         <span>Live Support Chat</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-extrabold px-2 py-0.5 rounded-full">
                           24/7 Live
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-emerald-600 font-bold text-xs">
+                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                     <span className="hidden sm:inline">Open Chat</span>
-                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" />
                   </div>
                 </button>
               )}
@@ -1486,7 +1528,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 href="https://t.me/Websitename"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-sky-50/70 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-sky-50/70 dark:hover:bg-sky-950/30 rounded-2xl transition-all text-left group"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-10 h-10 rounded-2xl bg-[#229ED9]/15 text-[#229ED9] border border-[#229ED9]/30 flex items-center justify-center group-hover:scale-105 transition-transform">
@@ -1495,7 +1537,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </svg>
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">
                       Telegram Support
                     </div>
                   </div>
@@ -1509,49 +1551,49 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {/* Option 6: Help & Support */}
               <button
                 onClick={() => setCurrentSubPage('help_support')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <HelpCircle className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">Help &amp; Support</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">Help &amp; Support</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 5: Privacy Policy */}
               <button
                 onClick={() => setCurrentSubPage('privacy_policy')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group cursor-pointer"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 border border-slate-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <Lock className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">Privacy Policy</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">Privacy Policy</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
 
               {/* Option 6: Terms & Conditions */}
               <button
                 onClick={() => setCurrentSubPage('terms_conditions')}
-                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 rounded-2xl transition-all text-left group cursor-pointer"
+                className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/60 rounded-2xl transition-all text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 border border-slate-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="font-bold text-sm text-slate-900">Terms &amp; Conditions</div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white">Terms &amp; Conditions</div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
               </button>
             </div>
 
@@ -1559,7 +1601,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="pt-2">
                 <button
                   onClick={logout}
-                  className="w-full py-3.5 px-4 bg-white hover:bg-rose-50 hover:text-rose-600 text-slate-600 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all border border-slate-100 shadow-sm"
+                  className="w-full py-3.5 px-4 bg-white dark:bg-slate-900 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all border border-slate-100 dark:border-slate-800 shadow-sm cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Log Out of Account</span>

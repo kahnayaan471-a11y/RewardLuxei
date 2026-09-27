@@ -3,6 +3,7 @@ import { User as UserIcon, Zap } from 'lucide-react';
 import { GoldCoin } from './GoldCoin';
 import { PWAInstallButton } from './PWAInstallButton';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getTodayDateString, getYesterdayDateString } from '../services/coinService';
 
 interface HeaderProps {
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuth
 }) => {
   const { profile, currentUser } = useAuth();
+  const { isDark } = useTheme();
 
   const today = getTodayDateString();
   const yesterday = getYesterdayDateString();
@@ -24,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   const activeStreak = isStreakActive ? (profile?.dailyStreak || 0) : 0;
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-2.5 shadow-xs">
+    <header className={`sticky top-0 z-30 ${isDark ? 'bg-[#0B0F19]/95 border-slate-800 text-white' : 'bg-white/95 border-slate-200/80 text-slate-900'} backdrop-blur-md border-b px-4 py-2.5 shadow-xs transition-colors duration-200`}>
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
         {/* Brand / Logo with Custom Gold Coin */}
         <div className="flex items-center gap-2">
@@ -32,10 +34,10 @@ export const Header: React.FC<HeaderProps> = ({
             <GoldCoin className="w-10 h-10" />
           </div>
           <div>
-            <span className="font-display font-black text-xl text-slate-900 tracking-tight leading-none flex items-center gap-1">
+            <span className={`font-display font-black text-xl tracking-tight leading-none flex items-center gap-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Reward<span className="text-amber-500">luxe</span>
             </span>
-            <span className="text-[10px] font-bold text-slate-700 tracking-wider uppercase flex items-center gap-1">
+            <span className={`text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-700'}`}>
               <Zap className="w-2.5 h-2.5 text-amber-500 fill-amber-500" /> Play &amp; Earn
             </span>
           </div>

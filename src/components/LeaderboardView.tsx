@@ -189,17 +189,17 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   };
 
   return (
-    <div className="space-y-3 pb-36 max-w-md mx-auto -mt-2 sm:-mt-3 text-slate-900">
+    <div className="space-y-3 pb-36 max-w-md mx-auto -mt-2 sm:-mt-3 text-slate-900 dark:text-slate-100">
       {/* Category Segmented Switcher: Coins Top vs Refer Leaderboard */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="grid grid-cols-2 p-1 bg-slate-200/85 rounded-2xl border border-slate-300/80 flex-1 shadow-2xs">
+        <div className="grid grid-cols-2 p-1 bg-slate-200/85 dark:bg-slate-800 rounded-2xl border border-slate-300/80 dark:border-slate-700 flex-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveTab('coins')}
             className={`py-2 px-3 rounded-xl font-display font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
               activeTab === 'coins'
-                ? 'bg-white text-slate-950 shadow-sm border border-slate-200'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white dark:bg-slate-700 text-slate-950 dark:text-white shadow-sm border border-slate-200 dark:border-slate-600'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <GoldCoin className="w-4 h-4" />
@@ -212,7 +212,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             className={`py-2 px-3 rounded-xl font-display font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
               activeTab === 'referrals'
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -224,7 +224,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           type="button"
           onClick={handleSyncLeaderboard}
           disabled={syncing}
-          className="p-2.5 bg-white hover:bg-slate-50 border border-slate-200/85 rounded-2xl shadow-2xs text-slate-600 hover:text-purple-600 transition-all cursor-pointer"
+          className="p-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200/85 dark:border-slate-700 rounded-2xl shadow-2xs text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 transition-all cursor-pointer"
           title="Refresh Leaderboard"
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin text-purple-600' : ''}`} />
@@ -476,11 +476,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
           {/* 3. Real-Time Leaderboard List */}
           <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="font-display font-black text-sm text-slate-900 flex items-center gap-1.5">
+            <h2 className="font-display font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
               <span>{activeTab === 'coins' ? 'All Players Ranking' : 'Top Refer Ranking'}</span>
-              <span className="text-xs font-bold text-slate-500">({displayedLeaders.length})</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">({displayedLeaders.length})</span>
             </h2>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               {activeTab === 'coins' ? 'Highest Coins' : 'Most Refer'}
             </span>
           </div>
@@ -504,13 +504,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   className={`rounded-2xl px-3.5 py-2.5 flex items-center justify-between border transition-all ${
                     isSelf
                       ? activeTab === 'referrals'
-                        ? 'bg-purple-50/90 border-purple-300 ring-2 ring-purple-400/40 shadow-xs'
-                        : 'bg-amber-50/90 border-amber-300 ring-2 ring-amber-400/40 shadow-xs'
+                        ? 'bg-purple-50/90 dark:bg-purple-950/70 border-purple-300 dark:border-purple-600 ring-2 ring-purple-400/40 shadow-xs'
+                        : 'bg-amber-50/90 dark:bg-amber-950/70 border-amber-300 dark:border-amber-600 ring-2 ring-amber-400/40 shadow-xs'
                       : isTop1
                       ? activeTab === 'referrals'
-                        ? 'bg-purple-50/40 border-purple-200'
-                        : 'bg-amber-50/50 border-amber-200'
-                      : 'bg-white border-slate-200/80 shadow-2xs hover:bg-slate-50'
+                        ? 'bg-purple-50/40 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/40'
+                        : 'bg-amber-50/50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/40'
+                      : 'bg-white dark:bg-slate-850 dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800/60'
                   }`}
                 >
                   {/* Left: Rank + Avatar + Name */}
@@ -523,7 +523,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       ) : isTop3 ? (
                         <span className="text-base">🥉</span>
                       ) : (
-                        <span className="font-display font-black text-xs sm:text-sm text-slate-500">
+                        <span className="font-display font-black text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                           #{rankNumber}
                         </span>
                       )}
@@ -533,7 +533,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       <img
                         src={user.photoURL}
                         alt={user.displayName || 'Player'}
-                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover shadow-xs border border-white flex-shrink-0"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover shadow-xs border border-white dark:border-slate-800 flex-shrink-0"
                         referrerPolicy="no-referrer"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid || user.displayName || 'player')}`;
@@ -543,7 +543,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       <div
                         className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full ${getInitialColor(
                           idx
-                        )} text-white font-bold text-xs sm:text-sm flex items-center justify-center shadow-xs border border-white flex-shrink-0`}
+                        )} text-white font-bold text-xs sm:text-sm flex items-center justify-center shadow-xs border border-white dark:border-slate-800 flex-shrink-0`}
                       >
                         {user.displayName
                           ? user.displayName.charAt(0).toUpperCase()
@@ -555,7 +555,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                     <div className="min-w-0 flex-1 pr-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                        <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
                           {user.displayName || (user.email ? user.email.split('@')[0] : `Player ${rankNumber}`)}
                         </span>
                         {user.isVerified && <VerifiedBadge size="sm" />}
@@ -576,24 +576,24 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   {activeTab === 'coins' ? (
                     <div className="flex items-center gap-1.5 shrink-0">
                       {(user.referralCount || 0) > 0 && (
-                        <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded-xl border border-purple-200/80 flex items-center gap-1">
-                          <Users className="w-3 h-3 text-purple-600" />
+                        <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-1 rounded-xl border border-purple-200/80 dark:border-purple-800/40 flex items-center gap-1">
+                          <Users className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                           <span>{user.referralCount}</span>
                         </span>
                       )}
-                      <div className="bg-slate-50 rounded-xl px-2.5 py-1.5 border border-slate-200/80 shadow-2xs flex items-center gap-1.5">
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-xl px-2.5 py-1.5 border border-slate-200/80 dark:border-slate-700 shadow-2xs flex items-center gap-1.5">
                         <GoldCoin className="w-4 h-4" />
-                        <span className="font-display font-black text-xs sm:text-sm text-slate-900">
+                        <span className="font-display font-black text-xs sm:text-sm text-slate-900 dark:text-amber-300">
                           {formatCoins(score)}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-purple-50 rounded-xl px-2.5 py-1.5 border border-purple-200/80 shadow-2xs flex items-center gap-1.5 shrink-0">
-                      <Users className="w-4 h-4 text-purple-600" />
-                      <span className="font-display font-black text-xs sm:text-sm text-purple-900">
+                    <div className="bg-purple-50 dark:bg-purple-950/60 rounded-xl px-2.5 py-1.5 border border-purple-200/80 dark:border-purple-800/40 shadow-2xs flex items-center gap-1.5 shrink-0">
+                      <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="font-display font-black text-xs sm:text-sm text-purple-900 dark:text-purple-300">
                         {userInvites}{' '}
-                        <span className="text-[10px] font-bold text-purple-600">Refer</span>
+                        <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400">Refer</span>
                       </span>
                     </div>
                   )}
@@ -606,16 +606,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
       {/* 4. Bottom Sticky "Your Ranking" Bar */}
       <div className="fixed bottom-16 left-0 right-0 max-w-md mx-auto px-4 pointer-events-none z-30">
-        <div className="pointer-events-auto bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-slate-200 shadow-xl">
+        <div className="pointer-events-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
           <div className={`rounded-xl px-3.5 py-2 flex items-center justify-between border ${
             activeTab === 'referrals'
-              ? 'bg-gradient-to-r from-purple-50 to-indigo-50/60 border-purple-200/80'
-              : 'bg-gradient-to-r from-amber-50 to-orange-50/60 border-amber-200/80'
+              ? 'bg-gradient-to-r from-purple-50 dark:from-purple-950/50 to-indigo-50/60 dark:to-indigo-950/40 border-purple-200/80 dark:border-purple-800/40'
+              : 'bg-gradient-to-r from-amber-50 dark:from-amber-950/50 to-orange-50/60 dark:to-orange-950/40 border-amber-200/80 dark:border-amber-800/40'
           }`}>
             {/* Left: Rank + Avatar + Name */}
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <span className={`font-display font-black text-xs sm:text-sm min-w-[1.6rem] ${
-                activeTab === 'referrals' ? 'text-purple-800' : 'text-amber-800'
+                activeTab === 'referrals' ? 'text-purple-800 dark:text-purple-300' : 'text-amber-800 dark:text-amber-300'
               }`}>
                 {myRank}
               </span>
@@ -624,26 +624,26 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                 <img
                   src={profile.photoURL}
                   alt={myName}
-                  className="w-8 h-8 rounded-full object-cover shadow-xs border border-white flex-shrink-0"
+                  className="w-8 h-8 rounded-full object-cover shadow-xs border border-white dark:border-slate-800 flex-shrink-0"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(profile?.uid || myName || 'player')}`;
                   }}
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center shadow-xs border border-white flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-slate-700 text-white font-black text-xs flex items-center justify-center shadow-xs border border-white dark:border-slate-800 flex-shrink-0">
                   {myName.charAt(0).toUpperCase()}
                 </div>
               )}
 
               <div className="min-w-0 pr-2">
                 <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-bold text-xs text-slate-900 truncate">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
                     {myName}
                   </span>
                   {profile?.isVerified && <VerifiedBadge size="sm" />}
                 </div>
-                <span className="text-[10px] text-slate-500 font-semibold block truncate">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold block truncate">
                   {myIndex >= 0
                     ? `Your Position on ${activeTab === 'coins' ? 'Coins' : 'Refer'} Leaderboard`
                     : activeTab === 'coins'
@@ -655,18 +655,18 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
             {/* Right: User's Score */}
             {activeTab === 'coins' ? (
-              <div className="bg-white rounded-xl px-2.5 py-1 border border-amber-200/80 shadow-2xs flex items-center gap-1.5 shrink-0">
+              <div className="bg-white dark:bg-slate-800 rounded-xl px-2.5 py-1 border border-amber-200/80 dark:border-amber-800/40 shadow-2xs flex items-center gap-1.5 shrink-0">
                 <GoldCoin className="w-4 h-4" />
-                <span className="font-display font-black text-xs sm:text-sm text-slate-950">
+                <span className="font-display font-black text-xs sm:text-sm text-slate-950 dark:text-amber-300">
                   {formatCoins(myCoins)}
                 </span>
               </div>
             ) : (
-              <div className="bg-white rounded-xl px-2.5 py-1 border border-purple-200/80 shadow-2xs flex items-center gap-1.5 shrink-0">
-                <Users className="w-4 h-4 text-purple-600" />
-                <span className="font-display font-black text-xs sm:text-sm text-purple-950">
+              <div className="bg-white dark:bg-slate-800 rounded-xl px-2.5 py-1 border border-purple-200/80 dark:border-purple-800/40 shadow-2xs flex items-center gap-1.5 shrink-0">
+                <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="font-display font-black text-xs sm:text-sm text-purple-950 dark:text-purple-300">
                   {myReferrals}{' '}
-                  <span className="text-[10px] text-purple-600 font-bold">Refer</span>
+                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold">Refer</span>
                 </span>
               </div>
             )}
