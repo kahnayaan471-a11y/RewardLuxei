@@ -208,6 +208,25 @@ export async function initializeUserProfile(
         updates.lastCaptchaDate = today;
       }
 
+      // Count actual approved tasks from user_tasks collection to enforce strict task lock
+      let actualApprovedCount = 0;
+      try {
+        const tasksQuery = query(
+          collection(db, 'user_tasks'),
+          where('userId', '==', uid),
+          where('status', '==', 'approved')
+        );
+        const tasksSnap = await getDocs(tasksQuery);
+        actualApprovedCount = tasksSnap.size;
+      } catch {
+        actualApprovedCount = data.completedTasksCount || 0;
+      }
+
+      // Strictly sync completedTasksCount to actual approved tasks count so no user can bypass task lock
+      if (data.completedTasksCount !== actualApprovedCount) {
+        updates.completedTasksCount = actualApprovedCount;
+      }
+
       try {
         await setDoc(userRef, sanitizePayload(updates), { merge: true });
       } catch (e) {
