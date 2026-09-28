@@ -806,14 +806,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div className="space-y-3">
-                {/* Developer 1: llliiizz_aa / Md Sanaullah Amir (with custom Instagram DP and redirect) */}
+                {/* Developer 1: liiiiizzaaaaaaaa (with custom Instagram DP and redirect) */}
                 <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#f8fafc] dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 hover:border-sky-200 transition-all">
                   <div className="flex items-center gap-3.5 min-w-0 pr-2">
-                    {/* Ring Avatar with uploaded image: https://iili.io/n2V9Vxj.jpg */}
+                    {/* Ring Avatar with uploaded image */}
                     <div className="w-13 h-13 rounded-full p-0.5 bg-gradient-to-tr from-sky-400 via-blue-300 to-sky-200 shadow-2xs shrink-0 flex items-center justify-center overflow-hidden">
                       <img
                         src="https://iili.io/n2V9Vxj.jpg"
-                        alt="llliiizz_aa"
+                        alt="liiiiizzaaaaaaaa"
                         referrerPolicy="no-referrer"
                         className="w-full h-full rounded-full object-cover object-center"
                       />
@@ -821,7 +821,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     <div className="min-w-0 truncate">
                       <div className="flex items-center gap-1.5">
                         <h4 className="font-display font-black text-base text-slate-900 dark:text-white tracking-tight truncate">
-                          llliiizz_aa
+                          liiiiizzaaaaaaaa
                         </h4>
                         {/* Exact Official Instagram Scalloped Verified Badge */}
                         <svg className="w-[18px] h-[18px] text-[#0095F6] shrink-0" viewBox="0 0 24 24" fill="none">
@@ -843,10 +843,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                   {/* Instagram Button with redirect link */}
                   <a
-                    href="https://www.instagram.com/llliiizz_aa?stkn=MjdibjFhaHNoZjN1"
+                    href="https://www.instagram.com/liiiiizzaaaaaaaa?stkn=MjdibjFhaHNoZjN1"
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open Instagram Profile @llliiizz_aa"
+                    title="Open Instagram Profile @liiiiizzaaaaaaaa"
                     className="w-11 h-11 rounded-2xl bg-[#eef4ff] dark:bg-slate-700/80 hover:bg-[#e0ecff] dark:hover:bg-slate-700 border border-[#d0e1fd] dark:border-slate-600 hover:border-pink-300 hover:shadow-md flex items-center justify-center shrink-0 active:scale-95 transition-all group cursor-pointer"
                   >
                     <svg
