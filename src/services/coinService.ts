@@ -208,25 +208,6 @@ export async function initializeUserProfile(
         updates.lastCaptchaDate = today;
       }
 
-      // Count actual approved tasks from user_tasks collection to enforce strict task lock
-      let actualApprovedCount = 0;
-      try {
-        const tasksQuery = query(
-          collection(db, 'user_tasks'),
-          where('userId', '==', uid),
-          where('status', '==', 'approved')
-        );
-        const tasksSnap = await getDocs(tasksQuery);
-        actualApprovedCount = tasksSnap.size;
-      } catch {
-        actualApprovedCount = data.completedTasksCount || 0;
-      }
-
-      // Strictly sync completedTasksCount to actual approved tasks count so no user can bypass task lock
-      if (data.completedTasksCount !== actualApprovedCount) {
-        updates.completedTasksCount = actualApprovedCount;
-      }
-
       try {
         await setDoc(userRef, sanitizePayload(updates), { merge: true });
       } catch (e) {
@@ -1711,19 +1692,41 @@ export async function adminUpdateUserProfile(
 // Admin: Set Custom Required Tasks Count for Withdrawal for a specific user
 export async function adminSetUserTaskRequirement(userId: string, requiredCount: number): Promise<void> {
   const userRef = doc(db, 'users', userId);
+  const nextReq = Math.max(0, requiredCount);
   await updateDoc(userRef, {
-    requiredTasksForWithdrawal: Math.max(0, requiredCount),
+    requiredTasksForWithdrawal: nextReq,
     updatedAt: Date.now()
   });
+
+  const cached = getCachedProfile(userId);
+  if (cached) {
+    cached.requiredTasksForWithdrawal = nextReq;
+    setCachedProfile(userId, cached);
+  }
 }
 
 // Admin: Set User Completed Tasks Count manually
 export async function adminSetUserCompletedTasks(userId: string, completedCount: number): Promise<void> {
   const userRef = doc(db, 'users', userId);
+  const nextComp = Math.max(0, completedCount);
   await updateDoc(userRef, {
-    completedTasksCount: Math.max(0, completedCount),
+    completedTasksCount: nextComp,
     updatedAt: Date.now()
   });
+
+  const cached = getCachedProfile(userId);
+  if (cached) {
+    cached.completedTasksCount = nextComp;
+    setCachedProfile(userId, cached);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('coin_balance_updated', {
+        detail: { userId, timestamp: Date.now() }
+      })
+    );
+  }
 }
 
 // Admin: Directly Assign or Force-Complete a Task for a User
