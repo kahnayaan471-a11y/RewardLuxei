@@ -28,7 +28,7 @@ const RANDOM_NAMES = [
   'Amitabh K.', 'Babulal M.', 'Ishaan V.', 'Zoya Khan', 'Rohan Mathur'
 ];
 
-const AMOUNTS = [10, 10, 20, 20, 30, 30, 50, 50, 100, 100, 250, 500, 1000];
+const AMOUNTS = [10, 10, 20, 20, 30, 30, 50, 50, 100, 100, 160, 250, 500, 1000];
 const METHODS: Array<'upi' | 'google_play' | 'bank_transfer'> = [
   'upi', 'upi', 'upi', 'google_play', 'google_play', 'bank_transfer'
 ];

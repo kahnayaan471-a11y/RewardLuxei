@@ -52,6 +52,7 @@ const PRESET_AMOUNTS = [
   { inr: 30, coins: 3000 },
   { inr: 50, coins: 5000 },
   { inr: 100, coins: 10000 },
+  { inr: 160, coins: 16000 },
   { inr: 250, coins: 25000 },
   { inr: 500, coins: 50000 },
   { inr: 1000, coins: 100000 },
