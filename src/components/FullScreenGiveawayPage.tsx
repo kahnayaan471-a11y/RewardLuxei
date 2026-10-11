@@ -34,6 +34,7 @@ import {
 import { GiveawayConfig, GiveawayEntry } from '../types';
 import { sound } from '../utils/sound';
 import { GiveawayCountdownTimer } from './GiveawayCountdownTimer';
+import { handlePrizeImageError, handleAvatarError } from '../utils/imageFallback';
 
 interface FullScreenGiveawayPageProps {
   onClose: () => void;
@@ -265,10 +266,7 @@ export const FullScreenGiveawayPage: React.FC<FullScreenGiveawayPageProps> = ({
                       src={prizeImgSrc}
                       alt="Premium Giveaway Prize"
                       referrerPolicy="no-referrer"
-                      onError={() => {
-                        console.warn('Prize image failed to load, switching to fallback image');
-                        setImgError(true);
-                      }}
+                      onError={(e) => handlePrizeImageError(e, config?.prizeTitle || 'Giveaway')}
                       className="w-full h-full object-cover transition-opacity duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
@@ -440,6 +438,8 @@ export const FullScreenGiveawayPage: React.FC<FullScreenGiveawayPageProps> = ({
                                 <img
                                   src={entry.userPhoto}
                                   alt={entry.userName}
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => handleAvatarError(e, entry.userName, entry.userId)}
                                   className="w-9 h-9 rounded-full object-cover border border-amber-400/40 shrink-0"
                                 />
                               ) : (

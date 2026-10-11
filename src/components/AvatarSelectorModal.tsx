@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/sound';
 import confetti from 'canvas-confetti';
+import { handleAvatarError } from '../utils/imageFallback';
 
 interface AvatarSelectorModalProps {
   isOpen: boolean;
@@ -515,6 +516,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                   alt="Profile Avatar Preview"
                   className="w-20 h-20 sm:w-22 sm:h-22 rounded-2xl object-cover border-3 border-purple-500 shadow-md bg-white"
                   referrerPolicy="no-referrer"
+                  onError={(e) => handleAvatarError(e, 'Avatar', 'preview')}
                 />
 
                 {/* AI Status Badge */}
@@ -703,6 +705,7 @@ export const AvatarSelectorModal: React.FC<AvatarSelectorModalProps> = ({
                           alt={avatar.label}
                           className="w-12 h-12 rounded-xl object-cover bg-slate-50"
                           referrerPolicy="no-referrer"
+                          onError={(e) => handleAvatarError(e, avatar.label, avatar.id)}
                         />
                         <span className="text-[9px] font-bold text-slate-700 truncate w-full text-center mt-1">
                           {avatar.label}

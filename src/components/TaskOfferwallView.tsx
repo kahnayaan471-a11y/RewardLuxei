@@ -38,6 +38,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/sound';
 import { OfferDetailsView } from './OfferDetailsView';
+import { handleTaskLogoError, handleScreenshotError } from '../utils/imageFallback';
 
 interface TaskOfferwallViewProps {
   onBack?: () => void;
@@ -453,6 +454,7 @@ export const TaskOfferwallView: React.FC<TaskOfferwallViewProps> = ({
                           alt={task.title}
                           className="w-12 h-12 rounded-xl object-cover shadow-xs border border-slate-100 shrink-0"
                           referrerPolicy="no-referrer"
+                          onError={(e) => handleTaskLogoError(e, task.title)}
                         />
                       ) : (
                         <div
@@ -718,6 +720,7 @@ export const TaskOfferwallView: React.FC<TaskOfferwallViewProps> = ({
                                 src={item.proofScreenshot}
                                 alt="Proof preview"
                                 className="w-20 h-20 object-cover rounded-lg border border-slate-300 shadow-2xs cursor-pointer hover:opacity-90 transition-opacity"
+                                onError={handleScreenshotError}
                                 onClick={() => setSelectedProofPreview(item.proofScreenshot || null)}
                               />
                               <button
@@ -826,6 +829,7 @@ export const TaskOfferwallView: React.FC<TaskOfferwallViewProps> = ({
                 <img
                   src={selectedProofPreview}
                   alt="Full Proof"
+                  onError={handleScreenshotError}
                   className="max-h-[60vh] object-contain rounded-xl border border-slate-200"
                 />
               </div>
@@ -977,6 +981,7 @@ export const TaskOfferwallView: React.FC<TaskOfferwallViewProps> = ({
                           <img
                             src={proofScreenshot}
                             alt="Proof Preview"
+                            onError={handleScreenshotError}
                             className="w-24 h-24 object-cover rounded-xl border border-purple-300 shadow-xs"
                           />
                           <button

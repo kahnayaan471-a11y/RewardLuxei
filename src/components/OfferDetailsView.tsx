@@ -20,6 +20,7 @@ import {
   submitTaskForReview
 } from '../services/coinService';
 import { sound } from '../utils/sound';
+import { handleTaskLogoError, handleScreenshotError } from '../utils/imageFallback';
 
 interface OfferDetailsViewProps {
   task: AppTask;
@@ -395,6 +396,7 @@ export const OfferDetailsView: React.FC<OfferDetailsViewProps> = ({
                 alt={task.title}
                 className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl object-cover shadow-lg border-2 border-white"
                 referrerPolicy="no-referrer"
+                onError={(e) => handleTaskLogoError(e, task.title)}
               />
             ) : (
               <div
@@ -588,6 +590,7 @@ export const OfferDetailsView: React.FC<OfferDetailsViewProps> = ({
                         <img
                           src={stepProof?.proofScreenshot || currentProgress?.proofScreenshot}
                           alt="Screenshot Proof"
+                          onError={handleScreenshotError}
                           onClick={() =>
                             setSelectedProofPreview(
                               stepProof?.proofScreenshot || currentProgress?.proofScreenshot || null
@@ -772,6 +775,7 @@ export const OfferDetailsView: React.FC<OfferDetailsViewProps> = ({
                   <img
                     src={proofScreenshot}
                     alt="Proof preview"
+                    onError={handleScreenshotError}
                     className="max-h-32 rounded-xl mx-auto border-2 border-purple-400 shadow-xs object-cover"
                   />
                   <span className="inline-block mt-1 text-[10px] font-bold text-emerald-600">
@@ -836,6 +840,7 @@ export const OfferDetailsView: React.FC<OfferDetailsViewProps> = ({
             <img
               src={selectedProofPreview}
               alt="Full Proof Screenshot"
+              onError={handleScreenshotError}
               className="w-full max-h-[80vh] object-contain rounded-2xl"
             />
           </div>

@@ -28,6 +28,7 @@ import {
 } from '../services/coinService';
 import { ReferralFriendItem } from '../types';
 import { sound } from '../utils/sound';
+import { handleAvatarError } from '../utils/imageFallback';
 
 interface ReferralViewProps {
   onOpenAuth: () => void;
@@ -399,7 +400,13 @@ export const ReferralView: React.FC<ReferralViewProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-white">
                     {friend.photoURL ? (
-                      <img src={friend.photoURL} alt={friend.displayName} className="w-full h-full object-cover" />
+                      <img
+                        src={friend.photoURL}
+                        alt={friend.displayName}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => handleAvatarError(e, friend.displayName, friend.uid)}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       friend.displayName.charAt(0).toUpperCase()
                     )}

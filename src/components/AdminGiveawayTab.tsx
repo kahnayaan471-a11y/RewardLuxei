@@ -36,6 +36,7 @@ import {
 } from '../services/coinService';
 import { GiveawayConfig, GiveawayEntry, FeatureToggles } from '../types';
 import { GiveawayCountdownTimer } from './GiveawayCountdownTimer';
+import { handlePrizeImageError, handleAvatarError } from '../utils/imageFallback';
 
 const SAMPLE_PRESET_IMAGES = [
   {
@@ -725,9 +726,7 @@ export const AdminGiveawayTab: React.FC = () => {
                     src={formatDirectImageUrl(prizeImageUrl)}
                     alt="Live Prize Preview"
                     referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=800&q=80';
-                    }}
+                    onError={(e) => handlePrizeImageError(e, title || 'Giveaway')}
                     className="w-16 h-12 object-cover rounded-xl border border-slate-800 shrink-0"
                   />
                   <div className="min-w-0 flex-1">
@@ -835,6 +834,8 @@ export const AdminGiveawayTab: React.FC = () => {
                           <img
                             src={entry.userPhoto}
                             alt={entry.userName}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => handleAvatarError(e, entry.userName, entry.userId)}
                             className="w-9 h-9 rounded-full object-cover border border-slate-700"
                           />
                         ) : (

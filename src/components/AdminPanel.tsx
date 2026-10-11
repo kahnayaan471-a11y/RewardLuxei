@@ -100,6 +100,8 @@ import {
   adminUpdateUserProfile,
   adminSetUserTaskRequirement,
   adminSetUserCompletedTasks,
+  adminAdjustUserCompletedTasks,
+  adminResetAllUserTasks,
   fetchTasks,
   subscribeToTasks,
   subscribeToUsers,
@@ -130,6 +132,7 @@ import {
 } from '../services/coinService';
 import { VerifiedBadge } from './VerifiedBadge';
 import { sound } from '../utils/sound';
+import { handleAvatarError, handleTaskLogoError, handleScreenshotError } from '../utils/imageFallback';
 
 // Preset avatars for Admin quick assignment
 const ADMIN_AVATAR_PRESETS = [
@@ -846,6 +849,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
       console.error('Failed to update task requirements:', err);
     } finally {
       setReqLoading(false);
+    }
+  };
+
+  // Quick 1-Click Adjust User Completed Tasks (+1 or -1)
+  const handleQuickAdjustTasks = async (user: UserProfile, delta: number) => {
+    try {
+      await adminAdjustUserCompletedTasks(user.uid, delta);
+      sound.playTick();
+      await loadData();
+    } catch (err) {
+      console.error('Failed to quick-adjust user tasks:', err);
+    }
+  };
+
+  // Reset Completed Tasks for All Users to 0 (Mandatory Withdrawal Lock)
+  const handleResetAllTasks = async () => {
+    if (window.confirm('Kya aap sabhi users ke completed tasks ko 0 karna chahte hain? Isse sabhi users ke liye withdrawal lock active ho jayega jab tak wo Offerwall se task na karein.')) {
+      try {
+        setResetAllLoading(true);
+        await adminResetAllUserTasks();
+        sound.playWin();
+        await loadData();
+      } catch (err) {
+        console.error('Failed to reset all tasks:', err);
+      } finally {
+        setResetAllLoading(false);
+      }
     }
   };
 
@@ -1993,6 +2023,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                                     <img
                                       src={stepP.proofScreenshot}
                                       alt={stepP.title}
+                                      onError={handleScreenshotError}
                                       className="w-full h-full object-cover transition-transform group-hover:scale-105"
                                     />
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold gap-1">
@@ -2022,6 +2053,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             <img
                               src={sub.proofScreenshot}
                               alt="Proof Screenshot"
+                              onError={handleScreenshotError}
                               className="w-full h-44 object-contain transition-transform duration-300 group-hover:scale-105"
                               onClick={() =>
                                 setSelectedProofImage({
@@ -2619,6 +2651,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                         alt={task.title}
                         className="w-11 h-11 rounded-full object-cover shadow-xs border border-slate-700 shrink-0"
                         referrerPolicy="no-referrer"
+                        onError={(e) => handleTaskLogoError(e, task.title)}
                       />
                     ) : (
                       <div
@@ -2811,6 +2844,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
               <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
               <span>Reset All (Coins & Referrals)</span>
             </button>
+
+            <button
+              onClick={handleResetAllTasks}
+              className="px-3.5 py-2.5 bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 border border-rose-600/60 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Reset all users' completed tasks to 0 (Mandatory withdrawal lock applies to all users)"
+            >
+              <Lock className="w-3.5 h-3.5 text-rose-400" />
+              <span>Zero All Tasks (Lock Payout)</span>
+            </button>
           </div>
 
           <div className="bg-[#0E1524] rounded-2xl border border-slate-800 shadow-sm overflow-hidden">
@@ -2875,9 +2917,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                                   alt={u.displayName || 'User'}
                                   className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-2xs group-hover:ring-2 group-hover:ring-amber-400 transition-all bg-slate-900"
                                   referrerPolicy="no-referrer"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
-                                  }}
+                                  onError={(e) => handleAvatarError(e, u.displayName || 'User', u.uid)}
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-xl bg-purple-900 text-purple-200 font-black text-sm flex items-center justify-center border border-purple-700 group-hover:ring-2 group-hover:ring-amber-400 transition-all shadow-2xs">
@@ -2954,9 +2994,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           {(u.coins || 0).toLocaleString()} Coins
                         </td>
                         <td className="p-3.5">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                              className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg border ${
                                 availCount > 0
                                   ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800/60'
                                   : 'bg-amber-400/10 text-amber-300 border-amber-400/30'
@@ -2964,6 +3004,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             >
                               {availCount} Avail ({compCount} done)
                             </span>
+                            <button
+                              onClick={() => handleQuickAdjustTasks(u, 1)}
+                              className="w-5 h-5 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-700/60 rounded flex items-center justify-center font-black text-xs transition-colors cursor-pointer active:scale-90"
+                              title="Add +1 completed task for this user"
+                            >
+                              +
+                            </button>
+                            <button
+                              onClick={() => handleQuickAdjustTasks(u, -1)}
+                              className="w-5 h-5 bg-rose-900/60 hover:bg-rose-800 text-rose-300 border border-rose-700/60 rounded flex items-center justify-center font-black text-xs transition-colors cursor-pointer active:scale-90"
+                              title="Minus -1 completed task for this user"
+                            >
+                              -
+                            </button>
                             <button
                               onClick={() => {
                                 setReqEditUser(u);
@@ -3804,9 +3858,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                         src={taskFormLogoUrl}
                         alt="Logo Preview"
                         className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0 bg-slate-900"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
+                        onError={(e) => handleTaskLogoError(e, 'Task')}
                       />
                     )}
                   </div>
@@ -4166,6 +4218,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                 <img
                   src={selectedProofImage.url}
                   alt="Proof Full High Res"
+                  onError={handleScreenshotError}
                   className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-lg"
                 />
               </div>
@@ -4904,9 +4957,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           alt="Preview"
                           className="w-14 h-14 rounded-xl object-cover border border-slate-700 shadow-md bg-slate-900"
                           referrerPolicy="no-referrer"
-                          onError={() => {
-                            // fallback
-                          }}
+                          onError={(e) => handleAvatarError(e, editDisplayName || 'User')}
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-xl bg-amber-400/20 text-amber-400 font-black text-xl flex items-center justify-center border border-amber-400/30 shadow-md">
@@ -4971,6 +5022,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                               alt={preset.label}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
+                              onError={(e) => handleAvatarError(e, preset.label)}
                             />
                             {isSelected && (
                               <div className="absolute inset-0 bg-amber-400/40 flex items-center justify-center">

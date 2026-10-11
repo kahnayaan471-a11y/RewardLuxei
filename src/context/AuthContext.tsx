@@ -163,6 +163,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updated.claimedReferralCoins = claimedReferralCoins;
         }
 
+        const taskUpdate = customEvent.detail as {
+          completedTasksCount?: number;
+          tasksUsedForWithdrawal?: number;
+          requiredTasksForWithdrawal?: number;
+        };
+        if (typeof taskUpdate.completedTasksCount === 'number') {
+          updated.completedTasksCount = taskUpdate.completedTasksCount;
+        }
+        if (typeof taskUpdate.tasksUsedForWithdrawal === 'number') {
+          updated.tasksUsedForWithdrawal = taskUpdate.tasksUsedForWithdrawal;
+        }
+        if (typeof taskUpdate.requiredTasksForWithdrawal === 'number') {
+          updated.requiredTasksForWithdrawal = taskUpdate.requiredTasksForWithdrawal;
+        }
+
         if (typeof dailyStreak === 'number') {
           updated.dailyStreak = dailyStreak;
         }

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { WithdrawalMethod, WithdrawalRequest, WithdrawalDetails } from '../types';
 import {
   submitWithdrawalRequest,
@@ -60,6 +61,7 @@ const PRESET_AMOUNTS = [
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, onOpenAuth, onOpenTasks }) => {
   const { profile, currentUser } = useAuth();
+  const { isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'withdraw' | 'history'>('withdraw');
   const [selectedMethod, setSelectedMethod] = useState<WithdrawalMethod>('upi');
@@ -301,6 +303,59 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
 
         {activeTab === 'withdraw' ? (
           <form onSubmit={handleSubmit} className="space-y-4 bg-slate-900/80 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-md">
+            {/* Task Lock Status Banner */}
+            {isTaskLocked ? (
+              <div className="p-4 bg-gradient-to-br from-rose-950/90 via-slate-900 to-amber-950/60 border-2 border-rose-500/60 rounded-2xl shadow-xl space-y-3 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center shrink-0">
+                    <Lock className="w-5 h-5 text-rose-400 animate-pulse" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-black text-sm text-white">
+                        🔒 Task Lock Active (Mandatory)
+                      </h3>
+                      <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-bold border border-rose-500/30">
+                        {tasksMissing} Task Required
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-200/90 mt-1 leading-relaxed">
+                      ₹{selectedInr} withdraw karne ke liye pehle Offerwall se <strong>{requiredTasks} task</strong> complete karna zaroori hai.
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                      <span className="text-slate-400">Task Status:</span>
+                      <span className="text-amber-300 font-extrabold">{availableTasks} / {requiredTasks} Completed</span>
+                      <span className="text-rose-400">({tasksMissing} task pending hai)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {onOpenTasks && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenTasks();
+                    }}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <ListTodo className="w-4 h-4" />
+                    <span>⚡ Pehle Offerwall se Task Complete Karo (Click Here)</span>
+                  </button>
+                )}
+              </div>
+            ) : requiredTasks > 0 ? (
+              <div className="p-3 bg-emerald-950/60 border border-emerald-500/40 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Task Gate Verified ({availableTasks} available tasks)</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-black px-2 py-0.5 rounded-full">
+                  UNLOCKED 🔓
+                </span>
+              </div>
+            ) : null}
+
             {/* Payment Methods Selection */}
             <div>
               <label className="text-xs font-bold text-amber-400/90 uppercase tracking-wider block mb-2">
@@ -524,13 +579,15 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
             )}
 
             {/* Submit CTA Button */}
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <button
                 type="submit"
-                disabled={loading || !hasEnoughCoins}
+                disabled={loading || !hasEnoughCoins || isTaskLocked}
                 className={`w-full py-3.5 px-4 rounded-2xl font-display font-extrabold text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer ${
                   !hasEnoughCoins
                     ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                    : isTaskLocked
+                    ? 'bg-rose-950/80 text-rose-300 border-2 border-rose-500/50 cursor-not-allowed hover:bg-rose-950/90'
                     : 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 shadow-amber-500/25'
                 }`}
               >
@@ -538,6 +595,11 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                   <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 ) : !hasEnoughCoins ? (
                   <span>Insufficient Coins (Need {requiredCoins - userCoins} more)</span>
+                ) : isTaskLocked ? (
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-rose-400" />
+                    <span>🔒 Pehle {tasksMissing} Task Complete Karo to Unlock</span>
+                  </div>
                 ) : (
                   <>
                     <span>Withdraw ₹{selectedInr} ({requiredCoins.toLocaleString()} Coins)</span>
@@ -545,6 +607,20 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({ isOpen, onClose, o
                   </>
                 )}
               </button>
+
+              {isTaskLocked && onOpenTasks && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenTasks();
+                  }}
+                  className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                >
+                  <ListTodo className="w-3.5 h-3.5" />
+                  <span>⚡ Go to Offerwall &amp; Complete Task Now</span>
+                </button>
+              )}
             </div>
 
             {/* Withdrawal Guidelines */}

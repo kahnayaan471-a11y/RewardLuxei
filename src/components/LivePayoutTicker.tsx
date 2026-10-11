@@ -6,6 +6,7 @@ import {
   LivePayoutFeedItem
 } from '../services/coinService';
 import { ALL_DEMO_USERS } from '../data/demoUsers';
+import { handleAvatarError } from '../utils/imageFallback';
 
 // Extensive pool of 80+ realistic, diverse Indian player names
 const RANDOM_NAMES = [
@@ -28,7 +29,16 @@ const RANDOM_NAMES = [
   'Amitabh K.', 'Babulal M.', 'Ishaan V.', 'Zoya Khan', 'Rohan Mathur'
 ];
 
-const AMOUNTS = [10, 10, 20, 20, 30, 30, 50, 50, 100, 100, 160, 250, 500, 1000];
+// Diverse realistic withdrawal amounts: both Lower (kam) and Higher (jyada)
+const DIVERSE_AMOUNTS = [
+  // Kam amounts (Lower withdrawals)
+  10, 20, 25, 30, 40, 50, 60, 75, 80, 100, 120, 150,
+  // Medium amounts
+  180, 200, 250, 300, 350, 400, 500, 650, 750, 800,
+  // Jyada amounts (Higher withdrawals)
+  1000, 1200, 1500, 1800, 2000, 2500, 3000, 4000, 5000
+];
+
 const METHODS: Array<'upi' | 'google_play' | 'bank_transfer'> = [
   'upi', 'upi', 'upi', 'google_play', 'google_play', 'bank_transfer'
 ];
@@ -62,12 +72,13 @@ export const LivePayoutTicker: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
-  // Keep track of recent names to avoid repeating the same name
+  // Keep track of recent names & amounts to avoid repeating
   const recentNamesRef = useRef<string[]>([]);
+  const recentAmountsRef = useRef<number[]>([]);
 
-  // Helper to generate a fresh randomized payout item with a unique name and DP
+  // Helper to generate a fresh randomized payout item with a unique name, DP and dynamic amount
   const getNextPayoutItem = (): DisplayPayoutItem => {
-    // 50% chance to pick from ALL_DEMO_USERS who have profile pictures!
+    // 75% chance to pick from ALL_DEMO_USERS who have profile pictures!
     const pickFromDemoUsers = Math.random() < 0.75 && ALL_DEMO_USERS.length > 0;
     
     let selectedName: string;
@@ -92,13 +103,18 @@ export const LivePayoutTicker: React.FC = () => {
     // Update recent names buffer (up to 25 names kept)
     recentNamesRef.current = [...recentNamesRef.current.slice(-24), selectedName];
 
-    // Check if there are real approved withdrawals to borrow amount/method from
-    let amount = getRandomElement(AMOUNTS);
-    let method = getRandomElement(METHODS);
+    // Pick diverse dynamic withdrawal amount (both lower and higher)
+    // Avoid repeating the exact same amount consecutively
+    let candidatePool = DIVERSE_AMOUNTS.filter(
+      (amt) => !recentAmountsRef.current.slice(-3).includes(amt)
+    );
+    if (candidatePool.length === 0) candidatePool = DIVERSE_AMOUNTS;
+    const amount = getRandomElement(candidatePool);
+    recentAmountsRef.current = [...recentAmountsRef.current.slice(-6), amount];
 
-    if (realPayouts.length > 0) {
+    let method = getRandomElement(METHODS);
+    if (realPayouts.length > 0 && Math.random() < 0.2) {
       const realItem = getRandomElement<LivePayoutFeedItem>(realPayouts);
-      if (realItem.inrAmount) amount = realItem.inrAmount;
       if (realItem.method) method = realItem.method;
     }
 
@@ -200,9 +216,7 @@ export const LivePayoutTicker: React.FC = () => {
                 alt={currentItem.userName}
                 className="w-6 h-6 rounded-full object-cover border border-emerald-400/60 shadow shrink-0"
                 referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentItem.userName || 'player')}`;
-                }}
+                onError={(e) => handleAvatarError(e, currentItem.userName, currentItem.id)}
               />
             ) : (
               <div className={`w-6 h-6 rounded-full bg-gradient-to-tr ${currentItem.avatarBg} flex items-center justify-center font-black text-[11px] text-white shadow-inner shrink-0`}>
@@ -224,7 +238,7 @@ export const LivePayoutTicker: React.FC = () => {
               <span className="text-slate-300 text-[10px] sm:text-[11px]">ne</span>
               <span className="font-black text-emerald-300 bg-emerald-950/80 border border-emerald-500/40 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 shrink-0 text-[11px]">
                 <IndianRupee className="w-3 h-3 stroke-[3]" />
-                {currentItem.inrAmount} ({(currentItem.inrAmount * 100).toLocaleString()} Coins) {getMethodBadge(currentItem.method)}
+                {currentItem.inrAmount.toLocaleString()} ({(currentItem.inrAmount * 100).toLocaleString()} Coins) {getMethodBadge(currentItem.method)}
               </span>
               <span className="text-slate-300 text-[10px] sm:text-[11px]">withdraw kiya</span>
             </div>

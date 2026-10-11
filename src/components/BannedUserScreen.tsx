@@ -16,6 +16,7 @@ import {
 import { UserProfile } from '../types';
 import { sound } from '../utils/sound';
 import { SupportChatModal } from './SupportChatModal';
+import { handleAvatarError } from '../utils/imageFallback';
 
 interface BannedUserScreenProps {
   profile: UserProfile | null;
@@ -153,6 +154,8 @@ export const BannedUserScreen: React.FC<BannedUserScreenProps> = ({ profile, onL
               <img 
                 src={profile?.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${profile?.uid || 'banned'}`}
                 alt={profile?.displayName || 'User'}
+                referrerPolicy="no-referrer"
+                onError={(e) => handleAvatarError(e, profile?.displayName || 'User', profile?.uid)}
                 className="w-14 h-14 rounded-2xl object-cover grayscale border-2 border-rose-500/60 shadow-lg shadow-rose-950/50"
               />
               <div className="absolute -top-1 -right-1 bg-rose-600 rounded-full p-1 text-white shadow">

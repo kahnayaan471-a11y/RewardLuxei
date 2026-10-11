@@ -17,6 +17,7 @@ import { UserProfile } from '../types';
 import { GoldCoin } from './GoldCoin';
 import { VerifiedBadge } from './VerifiedBadge';
 import { sound } from '../utils/sound';
+import { handleAvatarError } from '../utils/imageFallback';
 
 interface LeaderboardViewProps {
   initialTab?: 'coins' | 'referrals';
@@ -310,9 +311,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           alt={top2.displayName}
                           className="w-14 h-14 rounded-full object-cover border-2 border-slate-300 shadow-md"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(top2.uid || top2.displayName || 'player2')}`;
-                          }}
+                          onError={(e) => handleAvatarError(e, top2.displayName || 'Player 2', top2.uid)}
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-full bg-slate-700 text-slate-200 font-black text-lg flex items-center justify-center border-2 border-slate-300 shadow-md">
@@ -371,9 +370,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           alt={top1.displayName}
                           className="w-16 h-16 rounded-full object-cover border-3 border-amber-400 shadow-lg"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(top1.uid || top1.displayName || 'player1')}`;
-                          }}
+                          onError={(e) => handleAvatarError(e, top1.displayName || 'Champion', top1.uid)}
                         />
                       ) : (
                         <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 font-black text-xl flex items-center justify-center border-3 border-amber-300 shadow-lg">
@@ -425,9 +422,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           alt={top3.displayName}
                           className="w-14 h-14 rounded-full object-cover border-2 border-amber-600/70 shadow-md"
                           referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(top3.uid || top3.displayName || 'player3')}`;
-                          }}
+                          onError={(e) => handleAvatarError(e, top3.displayName || 'Player 3', top3.uid)}
                         />
                       ) : (
                         <div className="w-14 h-14 rounded-full bg-amber-900/80 text-amber-200 font-black text-lg flex items-center justify-center border-2 border-amber-600 shadow-md">
@@ -535,9 +530,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         alt={user.displayName || 'Player'}
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover shadow-xs border border-white dark:border-slate-800 flex-shrink-0"
                         referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid || user.displayName || 'player')}`;
-                        }}
+                        onError={(e) => handleAvatarError(e, user.displayName || user.email || 'Player', user.uid)}
                       />
                     ) : (
                       <div
@@ -626,9 +619,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   alt={myName}
                   className="w-8 h-8 rounded-full object-cover shadow-xs border border-white dark:border-slate-800 flex-shrink-0"
                   referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(profile?.uid || myName || 'player')}`;
-                  }}
+                  onError={(e) => handleAvatarError(e, myName, profile?.uid)}
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-slate-700 text-white font-black text-xs flex items-center justify-center shadow-xs border border-white dark:border-slate-800 flex-shrink-0">

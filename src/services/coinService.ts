@@ -58,12 +58,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 // Calculate required completed tasks for any withdrawal amount (₹10 = 1 task, ₹20 = 2 tasks, ₹50 = 5 tasks)
 export function calculateRequiredTasksForWithdrawal(inrAmount: number, userOverride?: number): number {
-  // Standard rule: 1 task per ₹10 (e.g. ₹10 -> 1 task, ₹20 -> 2 tasks, ₹50 -> 5 tasks, ₹100 -> 10 tasks)
-  const baseRequired = Math.max(1, Math.floor(inrAmount / 10));
-  if (userOverride !== undefined && userOverride > baseRequired) {
-    return userOverride;
+  // If admin specifically configured a custom task requirement for this user, respect it
+  if (userOverride !== undefined && userOverride !== null) {
+    return Math.max(0, userOverride);
   }
-  return baseRequired;
+  // Standard default rule: 1 task per ₹10 (e.g. ₹10 -> 1 task, ₹20 -> 2 tasks, ₹50 -> 5 tasks, ₹100 -> 10 tasks)
+  return Math.max(1, Math.floor(inrAmount / 10));
 }
 
 // Get user's available completed tasks that have not been consumed by previous withdrawals
@@ -1199,6 +1199,28 @@ export async function submitWithdrawalRequest(
     });
   });
 
+  // Immediately update local cache and dispatch UI event so available tasks decrease instantly
+  const cached = getCachedProfile(userId);
+  if (cached) {
+    cached.coins = Math.max(0, (cached.coins || 0) - coins);
+    cached.totalWithdrawn = (cached.totalWithdrawn || 0) + inrAmount;
+    cached.tasksUsedForWithdrawal = (cached.tasksUsedForWithdrawal || 0) + calculateRequiredTasksForWithdrawal(inrAmount, cached.requiredTasksForWithdrawal);
+    setCachedProfile(userId, cached);
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('coin_balance_updated', {
+        detail: {
+          userId,
+          amount: -coins,
+          tasksUsedForWithdrawal: cached ? cached.tasksUsedForWithdrawal : undefined,
+          timestamp: Date.now()
+        }
+      })
+    );
+  }
+
   return withdrawalId;
 }
 
@@ -1690,18 +1712,45 @@ export async function adminUpdateUserProfile(
 }
 
 // Admin: Set Custom Required Tasks Count for Withdrawal for a specific user
+// Admin: Set Custom Required Tasks Count for Withdrawal for a specific user
 export async function adminSetUserTaskRequirement(userId: string, requiredCount: number): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const nextReq = Math.max(0, requiredCount);
-  await updateDoc(userRef, {
-    requiredTasksForWithdrawal: nextReq,
-    updatedAt: Date.now()
-  });
+  try {
+    await setDoc(userRef, {
+      requiredTasksForWithdrawal: nextReq,
+      updatedAt: Date.now()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not update requiredTasksForWithdrawal in Firestore:', err);
+  }
 
   const cached = getCachedProfile(userId);
   if (cached) {
     cached.requiredTasksForWithdrawal = nextReq;
     setCachedProfile(userId, cached);
+  }
+
+  const demoIdx = ALL_DEMO_USERS.findIndex(u => u.uid === userId);
+  if (demoIdx >= 0) {
+    ALL_DEMO_USERS[demoIdx].requiredTasksForWithdrawal = nextReq;
+  }
+
+  const localUsers = getAllLocallyCachedUsers();
+  const luIdx = localUsers.findIndex(u => u.uid === userId);
+  if (luIdx >= 0) {
+    localUsers[luIdx].requiredTasksForWithdrawal = nextReq;
+    try {
+      localStorage.setItem('all_local_users', JSON.stringify(localUsers));
+    } catch {}
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('coin_balance_updated', {
+        detail: { userId, requiredTasksForWithdrawal: nextReq, timestamp: Date.now() }
+      })
+    );
   }
 }
 
@@ -1709,10 +1758,14 @@ export async function adminSetUserTaskRequirement(userId: string, requiredCount:
 export async function adminSetUserCompletedTasks(userId: string, completedCount: number): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const nextComp = Math.max(0, completedCount);
-  await updateDoc(userRef, {
-    completedTasksCount: nextComp,
-    updatedAt: Date.now()
-  });
+  try {
+    await setDoc(userRef, {
+      completedTasksCount: nextComp,
+      updatedAt: Date.now()
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Could not update completedTasksCount in Firestore:', err);
+  }
 
   const cached = getCachedProfile(userId);
   if (cached) {
@@ -1720,13 +1773,103 @@ export async function adminSetUserCompletedTasks(userId: string, completedCount:
     setCachedProfile(userId, cached);
   }
 
+  const demoIdx = ALL_DEMO_USERS.findIndex(u => u.uid === userId);
+  if (demoIdx >= 0) {
+    ALL_DEMO_USERS[demoIdx].completedTasksCount = nextComp;
+  }
+
+  const localUsers = getAllLocallyCachedUsers();
+  const luIdx = localUsers.findIndex(u => u.uid === userId);
+  if (luIdx >= 0) {
+    localUsers[luIdx].completedTasksCount = nextComp;
+    try {
+      localStorage.setItem('all_local_users', JSON.stringify(localUsers));
+    } catch {}
+  }
+
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('coin_balance_updated', {
-        detail: { userId, timestamp: Date.now() }
+        detail: { userId, completedTasksCount: nextComp, timestamp: Date.now() }
       })
     );
   }
+}
+
+// Admin: Adjust user completed tasks count (+ or - delta)
+export async function adminAdjustUserCompletedTasks(
+  userId: string,
+  delta: number
+): Promise<{ success: boolean; newCount: number }> {
+  let currentCount = 0;
+  const cached = getCachedProfile(userId);
+  if (cached && typeof cached.completedTasksCount === 'number') {
+    currentCount = cached.completedTasksCount;
+  } else {
+    try {
+      const snap = await getDoc(doc(db, 'users', userId));
+      if (snap.exists()) {
+        currentCount = (snap.data() as UserProfile).completedTasksCount || 0;
+      }
+    } catch {}
+  }
+
+  const newCount = Math.max(0, currentCount + delta);
+  await adminSetUserCompletedTasks(userId, newCount);
+  return { success: true, newCount };
+}
+
+// Admin: Reset all users' completed tasks to 0 (Mandatory lock for all users)
+export async function adminResetAllUserTasks(): Promise<{ success: boolean; count: number }> {
+  let count = 0;
+  try {
+    const q = query(collection(db, 'users'));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+
+    snap.docs.forEach((d) => {
+      batch.update(d.ref, {
+        completedTasksCount: 0,
+        tasksUsedForWithdrawal: 0,
+        updatedAt: Date.now()
+      });
+      const c = getCachedProfile(d.id);
+      if (c) {
+        c.completedTasksCount = 0;
+        c.tasksUsedForWithdrawal = 0;
+        setCachedProfile(d.id, c);
+      }
+      count++;
+    });
+
+    await batch.commit();
+  } catch (err) {
+    console.warn('Reset all user tasks in Firestore error:', err);
+  }
+
+  ALL_DEMO_USERS.forEach(u => {
+    u.completedTasksCount = 0;
+    u.tasksUsedForWithdrawal = 0;
+  });
+
+  const localUsers = getAllLocallyCachedUsers();
+  localUsers.forEach(u => {
+    u.completedTasksCount = 0;
+    u.tasksUsedForWithdrawal = 0;
+  });
+  try {
+    localStorage.setItem('all_local_users', JSON.stringify(localUsers));
+  } catch {}
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('coin_balance_updated', {
+        detail: { completedTasksCount: 0, tasksUsedForWithdrawal: 0, timestamp: Date.now() }
+      })
+    );
+  }
+
+  return { success: true, count };
 }
 
 // Admin: Directly Assign or Force-Complete a Task for a User
@@ -5055,6 +5198,8 @@ export async function updateFeatureToggles(
 
   return updated;
 }
+
+
 
 
 

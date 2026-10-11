@@ -27,6 +27,7 @@ import {
 } from '../services/supportService';
 import { SupportMessage } from '../types';
 import { sound } from '../utils/sound';
+import { handleScreenshotError } from '../utils/imageFallback';
 
 interface SupportChatModalProps {
   isOpen: boolean;
@@ -343,6 +344,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
                       <img
                         src={msg.photoURL}
                         alt="Support Screenshot"
+                        onError={handleScreenshotError}
                         className="w-full max-h-64 object-cover rounded-xl"
                         onClick={() => setZoomedImage(msg.photoURL || null)}
                       />
@@ -436,6 +438,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
               <img
                 src={selectedPhoto}
                 alt="Selected preview"
+                onError={handleScreenshotError}
                 className="w-12 h-12 object-cover rounded-xl border border-emerald-300 shadow-xs"
               />
               <div className="text-xs">
@@ -541,6 +544,7 @@ export const SupportChatModal: React.FC<SupportChatModalProps> = ({
           <img
             src={zoomedImage}
             alt="Full Preview"
+            onError={handleScreenshotError}
             className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />

@@ -34,6 +34,7 @@ import {
 import { GiveawayConfig, GiveawayEntry } from '../types';
 import { sound } from '../utils/sound';
 import { GiveawayCountdownTimer } from './GiveawayCountdownTimer';
+import { handlePrizeImageError, handleAvatarError } from '../utils/imageFallback';
 
 interface GiveawayModalProps {
   isOpen: boolean;
@@ -252,6 +253,7 @@ export const GiveawayModal: React.FC<GiveawayModalProps> = ({
                       src={config?.prizeImageUrl || 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=800&q=80'}
                       alt="Giveaway Prize Pool"
                       referrerPolicy="no-referrer"
+                      onError={(e) => handlePrizeImageError(e, config?.prizeTitle || 'Giveaway')}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/20" />
@@ -437,6 +439,8 @@ export const GiveawayModal: React.FC<GiveawayModalProps> = ({
                               <img
                                 src={entry.userPhoto}
                                 alt={entry.userName}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => handleAvatarError(e, entry.userName, entry.userId)}
                                 className="w-8 h-8 rounded-full object-cover border-2 border-amber-400/40 shrink-0"
                               />
                             ) : (

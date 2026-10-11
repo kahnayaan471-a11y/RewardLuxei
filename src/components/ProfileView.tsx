@@ -43,6 +43,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { CoinTransaction, UserReferralHistoryData } from '../types';
+import { handleAvatarError } from '../utils/imageFallback';
 import {
   fetchUserTransactions,
   fetchUserReferralHistory,
@@ -699,6 +700,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                                 src={friend.photoURL}
                                 alt={friend.displayName}
                                 className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => handleAvatarError(e, friend.displayName, friend.uid)}
                               />
                             ) : (
                               (friend.displayName || 'F').charAt(0).toUpperCase()
@@ -815,6 +818,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         src="https://iili.io/n2V9Vxj.jpg"
                         alt="liiiiizzaaaaaaaa"
                         referrerPolicy="no-referrer"
+                        onError={(e) => handleAvatarError(e, 'liiiiizzaaaaaaaa', 'dev1')}
                         className="w-full h-full rounded-full object-cover object-center"
                       />
                     </div>
@@ -879,6 +883,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         src="https://iili.io/n2Ms0Qt.jpg"
                         alt="_its_ibraheem___"
                         referrerPolicy="no-referrer"
+                        onError={(e) => handleAvatarError(e, '_its_ibraheem___', 'dev2')}
                         className="w-full h-full rounded-full object-cover object-center"
                       />
                     </div>
@@ -1249,6 +1254,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     alt={profile.displayName}
                     className="w-20 h-20 sm:w-22 sm:h-22 rounded-3xl bg-slate-100 dark:bg-slate-800 border-2 border-amber-300 shadow-md object-cover transition-transform group-hover:scale-105"
                     referrerPolicy="no-referrer"
+                    onError={(e) => handleAvatarError(e, profile.displayName || 'Player', profile.uid)}
                   />
                   <div className="absolute inset-0 bg-slate-950/40 rounded-3xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                     <Camera className="w-6 h-6 drop-shadow-md" />
