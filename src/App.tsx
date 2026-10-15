@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Header } from './components/Header';
-import { LivePayoutTicker } from './components/LivePayoutTicker';
 import { Navigation, TabType } from './components/Navigation';
 import { HomeDashboard } from './components/HomeDashboard';
 import { ReferralView } from './components/ReferralView';
@@ -134,9 +133,6 @@ const MainApp: React.FC = () => {
         onOpenCheckIn={() => setIsCheckInOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
       />
-
-      {/* Live Payout Trust Ticker */}
-      <LivePayoutTicker />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6">
