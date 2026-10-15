@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   X,
@@ -13,10 +13,14 @@ import {
   UserPlus,
   KeyRound,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/sound';
+import { checkIsVpn, VpnCheckResult } from '../utils/vpnDetector';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -29,11 +33,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
+  const [detectedVpn, setDetectedVpn] = useState<VpnCheckResult | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      checkIsVpn()
+        .then((res) => {
+          if (res.isVpn) {
+            setDetectedVpn(res);
+          } else {
+            setDetectedVpn(null);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -73,6 +93,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     setErrorMsg('');
     setResetSuccessMsg('');
+
+    // Strict Anti-VPN Inspection: Block login/signup if user is behind a VPN or Proxy
+    try {
+      const vpnStatus = await checkIsVpn(true);
+      if (vpnStatus.isVpn) {
+        setDetectedVpn(vpnStatus);
+        setErrorMsg('🚫 VPN Connection Detected! VPN ya Proxy lagakar login ya sign up karna strictly prohibited hai. Kripya apna VPN disconnect karein aur dobara try karein.');
+        sound.playError();
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Continue if network timeout
+    }
 
     try {
       if (mode === 'login') {
@@ -147,6 +181,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               : 'Enter your registered email to receive a password reset link.'}
           </p>
         </div>
+
+        {/* Live Anti-VPN Detection Warning Banner */}
+        {detectedVpn?.isVpn && (
+          <div className="mb-4 p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl text-xs text-rose-900 space-y-1.5 text-left shadow-sm">
+            <div className="flex items-center gap-2 font-black">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>VPN Connection Detected ({detectedVpn.ip})</span>
+            </div>
+            <p className="text-[11px] text-rose-700 leading-tight">
+              Aapka VPN / Proxy on hai. Security firewall ki wajah se VPN lagakar login ya sign up karna allowed nahi hai. Kripya pehle VPN disconnect karein.
+            </p>
+          </div>
+        )}
 
         {/* Mode Switcher Tabs (Only for login / signup) */}
         {mode !== 'forgot' ? (
@@ -306,31 +353,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <label className="text-[11px] font-bold text-slate-700">
                   Password
                 </label>
-                {mode === 'login' && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode('forgot');
-                      setErrorMsg('');
-                      setResetSuccessMsg('');
-                    }}
-                    className="text-[11px] font-extrabold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                    onClick={() => setShowPassword(prev => !prev)}
+                    className="text-[11px] font-bold text-slate-600 hover:text-amber-800 flex items-center gap-1 transition-colors cursor-pointer"
+                    title={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    Forgot Password?
+                    {showPassword ? (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-amber-700">Hide</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Show</span>
+                      </>
+                    )}
                   </button>
-                )}
+                  {mode === 'login' && (
+                    <>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('forgot');
+                          setErrorMsg('');
+                          setResetSuccessMsg('');
+                        }}
+                        className="text-[11px] font-extrabold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                      >
+                        Forgot?
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer rounded-lg hover:bg-slate-200/60"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-amber-600" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-slate-500" />
+                  )}
+                </button>
               </div>
             </div>
 

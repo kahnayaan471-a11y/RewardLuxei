@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield,
@@ -328,44 +328,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string>('');
 
-  // Load All Admin Data
-  const loadData = async () => {
-    setLoading(true);
+  // Load All Admin Data (Fast parallel fetch without screen freeze)
+  const loadData = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
-      // Load Withdrawals
-      const withQ = query(collection(db, 'withdrawals'), limit(100));
-      const withSnap = await getDocs(withQ);
-      const withList = withSnap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WithdrawalRequest, 'id'>) }));
-      withList.sort((a, b) => b.createdAt - a.createdAt);
+      const [withList, uList, allTasks, subs] = await Promise.all([
+        (async () => {
+          const withQ = query(collection(db, 'withdrawals'), limit(150));
+          const withSnap = await getDocs(withQ);
+          const list = withSnap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<WithdrawalRequest, 'id'>) }));
+          list.sort((a, b) => b.createdAt - a.createdAt);
+          return list;
+        })(),
+        fetchAdminUsers(),
+        fetchTasks(true),
+        fetchAdminTaskSubmissions()
+      ]);
+
       setWithdrawals(withList);
-
-      // Load Users
-      const uList = await fetchAdminUsers();
       setUsersList(uList);
-
-      // Load Tasks
-      const allTasks = await fetchTasks(true);
       setTasksList(allTasks);
-
-      // Load Task Proof Submissions
-      const subs = await fetchAdminTaskSubmissions();
       setTaskSubmissions(subs);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    let initialized = 0;
+    const checkInit = () => {
+      initialized++;
+      if (initialized >= 2) {
+        setLoading(false);
+      }
+    };
 
     const unsubscribeUsers = subscribeToUsers((liveUsers) => {
       setUsersList(liveUsers);
+      checkInit();
     });
 
     const unsubscribeWithdrawals = subscribeToWithdrawals((liveWithdrawals) => {
       setWithdrawals(liveWithdrawals);
+      checkInit();
     });
 
     const unsubscribeSubmissions = subscribeToAdminSubmissions((liveSubs) => {
@@ -380,7 +387,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
       setPrizeClaims(liveClaims);
     });
 
+    // Fast-fallback timeout: never keep loading state past 1s
+    const timer = setTimeout(() => setLoading(false), 1000);
+
     return () => {
+      clearTimeout(timer);
       unsubscribeUsers();
       unsubscribeWithdrawals();
       unsubscribeSubmissions();
@@ -389,36 +400,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     };
   }, []);
 
-  // Filtered withdrawals
-  const filteredWithdrawals = withdrawals.filter(w => {
-    if (statusFilter === 'all') return true;
-    return w.status === statusFilter;
-  });
+  // Deferred search values for silky smooth, lag-free 60fps typing
+  const deferredUserSearch = useDeferredValue(userSearch);
+  const deferredSubmissionSearch = useDeferredValue(submissionSearch);
+  const deferredPrizeClaimSearch = useDeferredValue(prizeClaimSearch);
+  const deferredHistorySearch = useDeferredValue(historySearch);
 
-  const pendingCount = withdrawals.filter(w => w.status === 'pending').length;
-  const pendingTaskCount = taskSubmissions.filter(s => s.status === 'pending_approval').length;
-  const pendingPrizeClaimCount = prizeClaims.filter(c => c.status === 'pending' || c.status === 'submitted').length;
+  // O(1) Instant User Lookup Map by UID (eliminates expensive scans in loops)
+  const usersMap = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    for (let i = 0; i < usersList.length; i++) {
+      const u = usersList[i];
+      if (u && u.uid) {
+        map.set(u.uid, u);
+      }
+    }
+    return map;
+  }, [usersList]);
 
-  const filteredPrizeClaims = prizeClaims.filter(c => {
-    const matchesFilter =
-      prizeClaimFilter === 'all'
-        ? true
-        : prizeClaimFilter === 'pending'
-        ? c.status === 'pending' || c.status === 'submitted'
-        : c.status === prizeClaimFilter;
+  // Filtered withdrawals (Memoized for high performance)
+  const filteredWithdrawals = useMemo(() => {
+    return withdrawals.filter(w => {
+      if (statusFilter === 'all') return true;
+      return w.status === statusFilter;
+    });
+  }, [withdrawals, statusFilter]);
 
-    if (!matchesFilter) return false;
+  const pendingCount = useMemo(() => withdrawals.filter(w => w.status === 'pending').length, [withdrawals]);
+  const pendingTaskCount = useMemo(() => taskSubmissions.filter(s => s.status === 'pending_approval').length, [taskSubmissions]);
+  const pendingPrizeClaimCount = useMemo(() => prizeClaims.filter(c => c.status === 'pending' || c.status === 'submitted').length, [prizeClaims]);
 
-    if (!prizeClaimSearch.trim()) return true;
-    const search = prizeClaimSearch.toLowerCase();
-    return (
-      (c.userName || '').toLowerCase().includes(search) ||
-      (c.userPhone || '').includes(search) ||
-      (c.prizeTitle || '').toLowerCase().includes(search) ||
-      (c.city || '').toLowerCase().includes(search) ||
-      (c.pincode || '').includes(search)
-    );
-  });
+  const filteredPrizeClaims = useMemo(() => {
+    return prizeClaims.filter(c => {
+      const matchesFilter =
+        prizeClaimFilter === 'all'
+          ? true
+          : prizeClaimFilter === 'pending'
+          ? c.status === 'pending' || c.status === 'submitted'
+          : c.status === prizeClaimFilter;
+
+      if (!matchesFilter) return false;
+
+      if (!deferredPrizeClaimSearch.trim()) return true;
+      const search = deferredPrizeClaimSearch.toLowerCase();
+      return (
+        (c.userName || '').toLowerCase().includes(search) ||
+        (c.userPhone || '').includes(search) ||
+        (c.prizeTitle || '').toLowerCase().includes(search) ||
+        (c.city || '').toLowerCase().includes(search) ||
+        (c.pincode || '').includes(search)
+      );
+    });
+  }, [prizeClaims, prizeClaimFilter, deferredPrizeClaimSearch]);
 
   const handleApprovePrizeClaim = async () => {
     if (!selectedPrizeClaim) return;
@@ -452,18 +485,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     }
   };
 
-  // Filtered Task Submissions
-  const filteredSubmissions = taskSubmissions.filter(s => {
-    if (submissionFilter !== 'all' && s.status !== submissionFilter) return false;
-    if (!submissionSearch.trim()) return true;
-    const q = submissionSearch.toLowerCase();
-    return (
-      (s.userName && s.userName.toLowerCase().includes(q)) ||
-      (s.userEmail && s.userEmail.toLowerCase().includes(q)) ||
-      (s.taskTitle && s.taskTitle.toLowerCase().includes(q)) ||
-      (s.proofText && s.proofText.toLowerCase().includes(q))
-    );
-  });
+  // Filtered Task Submissions (Memoized)
+  const filteredSubmissions = useMemo(() => {
+    return taskSubmissions.filter(s => {
+      if (submissionFilter !== 'all' && s.status !== submissionFilter) return false;
+      if (!deferredSubmissionSearch.trim()) return true;
+      const q = deferredSubmissionSearch.toLowerCase();
+      return (
+        (s.userName && s.userName.toLowerCase().includes(q)) ||
+        (s.userEmail && s.userEmail.toLowerCase().includes(q)) ||
+        (s.taskTitle && s.taskTitle.toLowerCase().includes(q)) ||
+        (s.proofText && s.proofText.toLowerCase().includes(q))
+      );
+    });
+  }, [taskSubmissions, submissionFilter, deferredSubmissionSearch]);
 
   // Map users by IP address to detect multi-accounts sharing the exact same IP / Wi-Fi
   const usersByIpMap = useMemo(() => {
@@ -507,37 +542,89 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     return usersList.filter(u => !!u.isVerified).length;
   }, [usersList]);
 
-  // Filtered users (Robust filter supporting IP, deviceId, network, name, email, UID, verification)
-  const filteredUsers = usersList.filter(u => {
-    if (onlySameIpFilter) {
-      const hasDupIp = u.lastIp && (usersByIpMap[u.lastIp]?.length || 0) > 1;
-      const hasDupDev = u.deviceId && (usersByDeviceMap[u.deviceId]?.length || 0) > 1;
-      if (!hasDupIp && !hasDupDev) return false;
-    }
+  // Filtered users (Memoized for high performance)
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(u => {
+      if (onlySameIpFilter) {
+        const hasDupIp = u.lastIp && (usersByIpMap[u.lastIp]?.length || 0) > 1;
+        const hasDupDev = u.deviceId && (usersByDeviceMap[u.deviceId]?.length || 0) > 1;
+        if (!hasDupIp && !hasDupDev) return false;
+      }
 
-    if (onlyVerifiedFilter && !u.isVerified) {
-      return false;
-    }
+      if (onlyVerifiedFilter && !u.isVerified) {
+        return false;
+      }
 
-    if (!userSearch || !userSearch.trim()) return true;
-    const q = userSearch.trim().toLowerCase();
-    const name = (u.displayName || '').toLowerCase();
-    const email = (u.email || '').toLowerCase();
-    const refCode = (u.referralCode || '').toLowerCase();
-    const uid = (u.uid || '').toLowerCase();
-    const ip = (u.lastIp || '').toLowerCase();
-    const deviceId = (u.deviceId || '').toLowerCase();
-    const net = (u.networkType || '').toLowerCase();
-    return (
-      name.includes(q) ||
-      email.includes(q) ||
-      refCode.includes(q) ||
-      uid.includes(q) ||
-      ip.includes(q) ||
-      deviceId.includes(q) ||
-      net.includes(q)
-    );
-  });
+      if (!deferredUserSearch || !deferredUserSearch.trim()) return true;
+      const q = deferredUserSearch.trim().toLowerCase();
+      const name = (u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      const refCode = (u.referralCode || '').toLowerCase();
+      const uid = (u.uid || '').toLowerCase();
+      const ip = (u.lastIp || '').toLowerCase();
+      const deviceId = (u.deviceId || '').toLowerCase();
+      const net = (u.networkType || '').toLowerCase();
+      return (
+        name.includes(q) ||
+        email.includes(q) ||
+        refCode.includes(q) ||
+        uid.includes(q) ||
+        ip.includes(q) ||
+        deviceId.includes(q) ||
+        net.includes(q)
+      );
+    });
+  }, [usersList, onlySameIpFilter, usersByIpMap, usersByDeviceMap, onlyVerifiedFilter, deferredUserSearch]);
+
+  // Fast Pagination states
+  const [usersPage, setUsersPage] = useState<number>(1);
+  const USERS_PER_PAGE = 30;
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(start, start + USERS_PER_PAGE);
+  }, [filteredUsers, usersPage]);
+
+  const [withPage, setWithPage] = useState<number>(1);
+  const WITH_PER_PAGE = 25;
+  const totalWithPages = Math.max(1, Math.ceil(filteredWithdrawals.length / WITH_PER_PAGE));
+  const paginatedWithdrawals = useMemo(() => {
+    const start = (withPage - 1) * WITH_PER_PAGE;
+    return filteredWithdrawals.slice(start, start + WITH_PER_PAGE);
+  }, [filteredWithdrawals, withPage]);
+
+  const [subPage, setSubPage] = useState<number>(1);
+  const SUB_PER_PAGE = 25;
+  const totalSubPages = Math.max(1, Math.ceil(filteredSubmissions.length / SUB_PER_PAGE));
+  const paginatedSubmissions = useMemo(() => {
+    const start = (subPage - 1) * SUB_PER_PAGE;
+    return filteredSubmissions.slice(start, start + SUB_PER_PAGE);
+  }, [filteredSubmissions, subPage]);
+
+  const [claimPage, setClaimPage] = useState<number>(1);
+  const CLAIMS_PER_PAGE = 20;
+  const totalClaimPages = Math.max(1, Math.ceil(filteredPrizeClaims.length / CLAIMS_PER_PAGE));
+  const paginatedPrizeClaims = useMemo(() => {
+    const start = (claimPage - 1) * CLAIMS_PER_PAGE;
+    return filteredPrizeClaims.slice(start, start + CLAIMS_PER_PAGE);
+  }, [filteredPrizeClaims, claimPage]);
+
+  // Reset page when filter/search changes
+  useEffect(() => {
+    setUsersPage(1);
+  }, [deferredUserSearch, onlySameIpFilter, onlyVerifiedFilter]);
+
+  useEffect(() => {
+    setWithPage(1);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    setSubPage(1);
+  }, [submissionFilter, deferredSubmissionSearch]);
+
+  useEffect(() => {
+    setClaimPage(1);
+  }, [prizeClaimFilter, deferredPrizeClaimSearch]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -614,179 +701,182 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     }
   };
 
-  // Filtered transactions for the User Coin History Modal
-  const filteredUserTransactions = userTransactions.filter(tx => {
-    // 1. Category Filter
-    if (historyFilter !== 'all') {
-      if (historyFilter === 'tasks' && tx.type !== 'task_reward') return false;
-      if (historyFilter === 'daily_checkin' && tx.type !== 'daily_checkin') return false;
-      if (historyFilter === 'spin_scratch' && tx.type !== 'spin' && tx.type !== 'scratch') return false;
-      if (historyFilter === 'captcha' && tx.type !== 'captcha') return false;
-      if (historyFilter === 'referral' && tx.type !== 'referral_bonus' && tx.type !== 'referral_signup' && tx.type !== 'referral_commission') return false;
-      if (historyFilter === 'leaderboard' && tx.type !== 'leaderboard_top_reward') return false;
-      if (historyFilter === 'admin' && tx.type !== 'admin_adjustment') return false;
-      if (historyFilter === 'withdrawal' && tx.type !== 'withdrawal' && tx.type !== 'withdrawal_refund') return false;
-    }
+  // Filtered transactions for the User Coin History Modal (Memoized)
+  const filteredUserTransactions = useMemo(() => {
+    return userTransactions.filter(tx => {
+      // 1. Category Filter
+      if (historyFilter !== 'all') {
+        if (historyFilter === 'tasks' && tx.type !== 'task_reward') return false;
+        if (historyFilter === 'daily_checkin' && tx.type !== 'daily_checkin') return false;
+        if (historyFilter === 'spin_scratch' && tx.type !== 'spin' && tx.type !== 'scratch') return false;
+        if (historyFilter === 'captcha' && tx.type !== 'captcha') return false;
+        if (historyFilter === 'referral' && tx.type !== 'referral_bonus' && tx.type !== 'referral_signup' && tx.type !== 'referral_commission') return false;
+        if (historyFilter === 'leaderboard' && tx.type !== 'leaderboard_top_reward') return false;
+        if (historyFilter === 'admin' && tx.type !== 'admin_adjustment') return false;
+        if (historyFilter === 'withdrawal' && tx.type !== 'withdrawal' && tx.type !== 'withdrawal_refund') return false;
+      }
 
-    // 2. Search Query
-    if (historySearch.trim()) {
-      const q = historySearch.toLowerCase();
-      const descMatch = tx.description ? tx.description.toLowerCase().includes(q) : false;
-      const typeMatch = tx.type ? tx.type.toLowerCase().includes(q) : false;
-      const amountMatch = tx.amount ? tx.amount.toString().includes(q) : false;
-      return descMatch || typeMatch || amountMatch;
-    }
+      // 2. Search Query
+      if (deferredHistorySearch.trim()) {
+        const q = deferredHistorySearch.toLowerCase();
+        const descMatch = tx.description ? tx.description.toLowerCase().includes(q) : false;
+        const typeMatch = tx.type ? tx.type.toLowerCase().includes(q) : false;
+        const amountMatch = tx.amount ? tx.amount.toString().includes(q) : false;
+        return descMatch || typeMatch || amountMatch;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [userTransactions, historyFilter, deferredHistorySearch]);
 
-  // Calculate detailed coin category totals for history modal
-  const historyStats = {
-    totalCoinsEarned: userTransactions
-      .filter(t => t.type !== 'withdrawal' && t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0),
-    tasksCoins: userTransactions
-      .filter(t => t.type === 'task_reward')
-      .reduce((sum, t) => sum + t.amount, 0),
-    tasksCount: userTransactions.filter(t => t.type === 'task_reward').length,
-    dailyCheckinCoins: userTransactions
-      .filter(t => t.type === 'daily_checkin')
-      .reduce((sum, t) => sum + t.amount, 0),
-    dailyCheckinCount: userTransactions.filter(t => t.type === 'daily_checkin').length,
-    spinScratchCoins: userTransactions
-      .filter(t => t.type === 'spin' || t.type === 'scratch')
-      .reduce((sum, t) => sum + t.amount, 0),
-    spinScratchCount: userTransactions.filter(t => t.type === 'spin' || t.type === 'scratch').length,
-    captchaCoins: userTransactions
-      .filter(t => t.type === 'captcha')
-      .reduce((sum, t) => sum + t.amount, 0),
-    captchaCount: userTransactions.filter(t => t.type === 'captcha').length,
-    referralBonusCoins: userTransactions
-      .filter(t => t.type === 'referral_bonus' || t.type === 'referral_signup')
-      .reduce((sum, t) => sum + t.amount, 0),
-    referralCommissionCoins: userTransactions
-      .filter(t => t.type === 'referral_commission')
-      .reduce((sum, t) => sum + t.amount, 0),
-    referralTotalCount: userTransactions.filter(t => t.type === 'referral_bonus' || t.type === 'referral_signup' || t.type === 'referral_commission').length,
-    adminAdjustmentCoins: userTransactions
-      .filter(t => t.type === 'admin_adjustment')
-      .reduce((sum, t) => sum + t.amount, 0),
-    adminAdjustmentCount: userTransactions.filter(t => t.type === 'admin_adjustment').length,
-    leaderboardCoins: userTransactions
-      .filter(t => t.type === 'leaderboard_top_reward')
-      .reduce((sum, t) => sum + t.amount, 0),
-    leaderboardCount: userTransactions.filter(t => t.type === 'leaderboard_top_reward').length,
-    withdrawnCoins: userTransactions
-      .filter(t => t.type === 'withdrawal')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0),
-    withdrawalCount: userTransactions.filter(t => t.type === 'withdrawal').length,
-  };
+  // Calculate detailed coin category totals for history modal (Memoized)
+  const historyStats = useMemo(() => {
+    return {
+      totalCoinsEarned: userTransactions
+        .filter(t => t.type !== 'withdrawal' && t.amount > 0)
+        .reduce((sum, t) => sum + t.amount, 0),
+      tasksCoins: userTransactions
+        .filter(t => t.type === 'task_reward')
+        .reduce((sum, t) => sum + t.amount, 0),
+      tasksCount: userTransactions.filter(t => t.type === 'task_reward').length,
+      dailyCheckinCoins: userTransactions
+        .filter(t => t.type === 'daily_checkin')
+        .reduce((sum, t) => sum + t.amount, 0),
+      dailyCheckinCount: userTransactions.filter(t => t.type === 'daily_checkin').length,
+      spinScratchCoins: userTransactions
+        .filter(t => t.type === 'spin' || t.type === 'scratch')
+        .reduce((sum, t) => sum + t.amount, 0),
+      spinScratchCount: userTransactions.filter(t => t.type === 'spin' || t.type === 'scratch').length,
+      captchaCoins: userTransactions
+        .filter(t => t.type === 'captcha')
+        .reduce((sum, t) => sum + t.amount, 0),
+      captchaCount: userTransactions.filter(t => t.type === 'captcha').length,
+      referralBonusCoins: userTransactions
+        .filter(t => t.type === 'referral_bonus' || t.type === 'referral_signup')
+        .reduce((sum, t) => sum + t.amount, 0),
+      referralCommissionCoins: userTransactions
+        .filter(t => t.type === 'referral_commission')
+        .reduce((sum, t) => sum + t.amount, 0),
+      referralTotalCount: userTransactions.filter(t => t.type === 'referral_bonus' || t.type === 'referral_signup' || t.type === 'referral_commission').length,
+      adminAdjustmentCoins: userTransactions
+        .filter(t => t.type === 'admin_adjustment')
+        .reduce((sum, t) => sum + t.amount, 0),
+      adminAdjustmentCount: userTransactions.filter(t => t.type === 'admin_adjustment').length,
+      leaderboardCoins: userTransactions
+        .filter(t => t.type === 'leaderboard_top_reward')
+        .reduce((sum, t) => sum + t.amount, 0),
+      leaderboardCount: userTransactions.filter(t => t.type === 'leaderboard_top_reward').length,
+      withdrawnCoins: userTransactions
+        .filter(t => t.type === 'withdrawal')
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+      withdrawalCount: userTransactions.filter(t => t.type === 'withdrawal').length,
+    };
+  }, [userTransactions]);
 
-  // Handle Task Proof Approval / Rejection
+  // Handle Task Proof Approval / Rejection (Instant Optimistic Update)
   const handleConfirmTaskAction = async () => {
     if (!selectedTaskSubmission || !taskActionType) return;
-    setTaskActionLoading(true);
+    const subId = selectedTaskSubmission.id;
+    const isApprove = taskActionType === 'approve';
+    const note = taskAdminNote || (isApprove ? 'Task proof verified & coins credited successfully' : 'Task proof invalid or requirements not met');
+
+    // Instant UI update
+    setTaskSubmissions(prev => prev.map(s => s.id === subId ? { ...s, status: isApprove ? 'approved' : 'rejected', adminNotes: note } : s));
+    setSelectedTaskSubmission(null);
+    setTaskActionType(null);
+    setTaskAdminNote('');
+    if (isApprove) sound.playWin(); else sound.playTick();
+
     try {
-      if (taskActionType === 'approve') {
-        await adminApproveTaskSubmission(
-          selectedTaskSubmission,
-          taskAdminNote || 'Task proof verified & coins credited successfully'
-        );
-        sound.playWin();
+      if (isApprove) {
+        await adminApproveTaskSubmission(selectedTaskSubmission, note);
       } else {
-        await adminRejectTaskSubmission(
-          selectedTaskSubmission.id,
-          taskAdminNote || 'Task proof invalid or requirements not met'
-        );
-        sound.playTick();
+        await adminRejectTaskSubmission(subId, note);
       }
-      setSelectedTaskSubmission(null);
-      setTaskActionType(null);
-      setTaskAdminNote('');
-      await loadData();
     } catch (err) {
       console.error('Error updating task proof submission:', err);
-    } finally {
-      setTaskActionLoading(false);
     }
   };
 
-  // Handle Approve
+  // Handle Approve Withdrawal (Instant Optimistic Update)
   const handleConfirmApprove = async () => {
     if (!selectedWithdrawal) return;
-    setActionLoading(true);
+    const wid = selectedWithdrawal.id;
+    const finalTxn = transactionId || `TXN-${Date.now().toString(36).toUpperCase()}`;
+    const finalNote = adminNote || 'Payment approved and sent';
+    const finalCode = redeemCode || undefined;
+
+    // Instant UI update
+    setWithdrawals(prev => prev.map(w => w.id === wid ? { ...w, status: 'approved', transactionId: finalTxn, adminNotes: finalNote, redeemCode: finalCode } : w));
+    setSelectedWithdrawal(null);
+    setActionType(null);
+    setAdminNote('');
+    setTransactionId('');
+    setRedeemCode('');
+    sound.playWin();
+
     try {
-      await approveWithdrawal(
-        selectedWithdrawal.id,
-        adminNote || 'Payment approved and sent',
-        transactionId || `TXN-${Date.now().toString(36).toUpperCase()}`,
-        redeemCode || undefined
-      );
-      sound.playWin();
-      setSelectedWithdrawal(null);
-      setActionType(null);
-      setAdminNote('');
-      setTransactionId('');
-      setRedeemCode('');
-      await loadData();
+      await approveWithdrawal(wid, finalNote, finalTxn, finalCode);
     } catch (err) {
       console.error('Approve failed:', err);
-    } finally {
-      setActionLoading(false);
     }
   };
 
-  // Handle Reject
+  // Handle Reject Withdrawal (Instant Optimistic Update)
   const handleConfirmReject = async () => {
     if (!selectedWithdrawal) return;
-    setActionLoading(true);
+    const wid = selectedWithdrawal.id;
+    const finalNote = adminNote || 'Invalid payment details or suspicious activity';
+
+    // Instant UI update
+    setWithdrawals(prev => prev.map(w => w.id === wid ? { ...w, status: 'rejected', adminNotes: finalNote } : w));
+    setSelectedWithdrawal(null);
+    setActionType(null);
+    setAdminNote('');
+    sound.playError();
+
     try {
-      await rejectWithdrawal(
-        selectedWithdrawal.id,
-        adminNote || 'Invalid payment details or suspicious activity',
-        true
-      );
-      sound.playError();
-      setSelectedWithdrawal(null);
-      setActionType(null);
-      setAdminNote('');
-      await loadData();
+      await rejectWithdrawal(wid, finalNote, true);
     } catch (err) {
       console.error('Reject failed:', err);
-    } finally {
-      setActionLoading(false);
     }
   };
 
-  // Handle User Coin Adjustment
+  // Handle User Coin Adjustment (Instant Optimistic Update)
   const handleConfirmAdjust = async () => {
     if (!adjustUser) return;
-    setActionLoading(true);
+    const uid = adjustUser.uid;
+    const amt = Number(adjustAmount);
+    const reason = adjustReason;
+
+    // Instant UI update
+    setUsersList(prev => prev.map(u => u.uid === uid ? { ...u, coins: Math.max(0, (u.coins || 0) + amt) } : u));
+    sound.playCoinSound();
+    setAdjustUser(null);
+
     try {
-      await adminAdjustUserCoins(adjustUser.uid, Number(adjustAmount), adjustReason);
-      sound.playCoinSound();
-      setAdjustUser(null);
-      await loadData();
+      await adminAdjustUserCoins(uid, amt, reason);
     } catch (err) {
       console.error('Adjust coins failed:', err);
-    } finally {
-      setActionLoading(false);
     }
   };
 
-  // Handle User Referral Adjustment (Add or Deduct/Minus)
+  // Handle User Referral Adjustment (Instant Optimistic Update)
   const handleConfirmAdjustReferrals = async () => {
     if (!adjustRefUser) return;
-    setAdjustRefLoading(true);
+    const uid = adjustRefUser.uid;
+    const count = Number(adjustRefCount);
+    const reason = adjustRefReason;
+
+    // Instant UI update
+    setUsersList(prev => prev.map(u => u.uid === uid ? { ...u, referralCount: Math.max(0, (u.referralCount || 0) + count) } : u));
+    sound.playWin();
+    setAdjustRefUser(null);
+
     try {
-      await adminAdjustUserReferrals(adjustRefUser.uid, Number(adjustRefCount), adjustRefReason);
-      sound.playWin();
-      setAdjustRefUser(null);
-      await loadData();
+      await adminAdjustUserReferrals(uid, count, reason);
     } catch (err) {
       console.error('Adjust referrals failed:', err);
-    } finally {
-      setAdjustRefLoading(false);
     }
   };
 
@@ -797,7 +887,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
       await adminResetAllUserCoinsOnly();
       sound.playWin();
       setShowResetCoinsModal(false);
-      await loadData();
+      setUsersList(prev => prev.map(u => ({ ...u, coins: 0 })));
     } catch (err) {
       console.error('Reset all coins failed:', err);
     } finally {
@@ -812,7 +902,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
       await adminResetAllUsersCoinsAndReferrals();
       sound.playWin();
       setShowResetAllModal(false);
-      await loadData();
+      setUsersList(prev => prev.map(u => ({ ...u, coins: 0, referralCount: 0 })));
     } catch (err) {
       console.error('Reset all users failed:', err);
     } finally {
@@ -820,57 +910,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     }
   };
 
-  // Handle Reset Single User's Coins & Referrals to 0
+  // Handle Reset Single User's Coins & Referrals to 0 (Instant Optimistic Update)
   const handleResetSingleUser = async (u: UserProfile) => {
     if (window.confirm(`Reset coins and referrals to 0 for ${u.displayName || u.email}?`)) {
+      setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, coins: 0, referralCount: 0 } : usr));
+      sound.playWin();
       try {
         await adminResetUserCoinsAndReferrals(u.uid);
-        sound.playWin();
-        await loadData();
       } catch (err) {
         console.error('Reset single user failed:', err);
       }
     }
   };
 
-  // Handle Save User Task Requirement & Completed Count
+  // Handle Save User Task Requirement & Completed Count (Instant Optimistic Update)
   const handleSaveTaskRequirement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqEditUser) return;
+    const uid = reqEditUser.uid;
+    const req = Number(reqRequiredCount);
+    const comp = Number(reqCompletedCount);
 
-    setReqLoading(true);
+    setUsersList(prev => prev.map(u => u.uid === uid ? { ...u, requiredTasksForWithdrawal: req, completedTasksCount: comp } : u));
+    sound.playWin();
+    setReqEditUser(null);
+
     try {
-      await adminSetUserTaskRequirement(reqEditUser.uid, Number(reqRequiredCount));
-      await adminSetUserCompletedTasks(reqEditUser.uid, Number(reqCompletedCount));
-      sound.playWin();
-      setReqEditUser(null);
-      await loadData();
+      await adminSetUserTaskRequirement(uid, req);
+      await adminSetUserCompletedTasks(uid, comp);
     } catch (err) {
       console.error('Failed to update task requirements:', err);
-    } finally {
-      setReqLoading(false);
     }
   };
 
-  // Quick 1-Click Adjust User Completed Tasks (+1 or -1)
+  // Quick 1-Click Adjust User Completed Tasks (+1 or -1) (Instant Optimistic Update)
   const handleQuickAdjustTasks = async (user: UserProfile, delta: number) => {
+    setUsersList(prev => prev.map(u => u.uid === user.uid ? {
+      ...u,
+      completedTasksCount: Math.max(0, (u.completedTasksCount || 0) + delta)
+    } : u));
+    sound.playTick();
+
     try {
       await adminAdjustUserCompletedTasks(user.uid, delta);
-      sound.playTick();
-      await loadData();
     } catch (err) {
       console.error('Failed to quick-adjust user tasks:', err);
     }
   };
 
-  // Reset Completed Tasks for All Users to 0 (Mandatory Withdrawal Lock)
+  // Reset Completed Tasks for All Users to 0 (Mandatory Withdrawal Lock - Instant Optimistic)
   const handleResetAllTasks = async () => {
     if (window.confirm('Kya aap sabhi users ke completed tasks ko 0 karna chahte hain? Isse sabhi users ke liye withdrawal lock active ho jayega jab tak wo Offerwall se task na karein.')) {
+      setUsersList(prev => prev.map(u => ({ ...u, completedTasksCount: 0, tasksUsedForWithdrawal: 0 })));
+      sound.playWin();
+      setResetAllLoading(true);
       try {
-        setResetAllLoading(true);
         await adminResetAllUserTasks();
-        sound.playWin();
-        await loadData();
       } catch (err) {
         console.error('Failed to reset all tasks:', err);
       } finally {
@@ -936,11 +1031,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
           : u
       ));
 
-      await loadData();
       setTimeout(() => {
         setEditProfileUser(null);
         setEditProfileMsg(null);
-      }, 1000);
+      }, 700);
     } catch (err: any) {
       console.error('Failed to update user profile:', err);
       setEditProfileMsg({ type: 'error', text: err?.message || 'Failed to update user profile.' });
@@ -1188,7 +1282,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
 
       setIsTaskModalOpen(false);
       sound.playWin();
-      await loadData();
     } catch (err: any) {
       console.error('Error saving task:', err);
       setTaskErrorMsg(err?.message || 'Failed to save task. Please try again.');
@@ -1220,22 +1313,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     }
   };
 
-  // Analytics Math
-  const totalApprovedInr = withdrawals
-    .filter(w => w.status === 'approved')
-    .reduce((sum, w) => sum + (w.inrAmount || 0), 0);
+  // Analytics Math (Memoized for zero-lag renders)
+  const totalApprovedInr = useMemo(() => {
+    return withdrawals
+      .filter(w => w.status === 'approved')
+      .reduce((sum, w) => sum + (w.inrAmount || 0), 0);
+  }, [withdrawals]);
 
-  const pendingInr = withdrawals
-    .filter(w => w.status === 'pending')
-    .reduce((sum, w) => sum + (w.inrAmount || 0), 0);
+  const pendingInr = useMemo(() => {
+    return withdrawals
+      .filter(w => w.status === 'pending')
+      .reduce((sum, w) => sum + (w.inrAmount || 0), 0);
+  }, [withdrawals]);
 
-  const totalUserCoins = usersList.reduce((sum, u) => sum + (u.coins || 0), 0);
+  const totalUserCoins = useMemo(() => {
+    return usersList.reduce((sum, u) => sum + (u.coins || 0), 0);
+  }, [usersList]);
 
-  const upiRequests = withdrawals.filter(w => w.method === 'upi').length;
-  const playRequests = withdrawals.filter(w => w.method === 'google_play').length;
-  const bankRequests = withdrawals.filter(w => w.method === 'bank_transfer').length;
+  const upiRequests = useMemo(() => withdrawals.filter(w => w.method === 'upi').length, [withdrawals]);
+  const playRequests = useMemo(() => withdrawals.filter(w => w.method === 'google_play').length, [withdrawals]);
+  const bankRequests = useMemo(() => withdrawals.filter(w => w.method === 'bank_transfer').length, [withdrawals]);
 
-  const adminMenuItems = [
+  const adminMenuItems = useMemo(() => [
     { id: 'withdrawals', label: 'Withdrawals', icon: CreditCard, badge: pendingCount, badgeColor: 'bg-rose-500 text-white', desc: 'Payout requests & approvals' },
     { id: 'task_proofs', label: 'Task Proofs', icon: FileCheck, badge: pendingTaskCount, badgeColor: 'bg-amber-500 text-slate-950', desc: 'Screenshot proofs review' },
     { id: 'prize_claims', label: 'Prize Claims', icon: Gift, badge: pendingPrizeClaimCount, badgeColor: 'bg-amber-500 text-slate-950', desc: 'Physical reward claims' },
@@ -1246,7 +1345,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     { id: 'users', label: 'Users', icon: Users, badge: usersList.length, badgeColor: 'bg-slate-800 text-slate-300', desc: 'Player accounts & balances' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, badge: undefined, badgeColor: '', desc: 'Platform coin metrics & stats' },
     { id: 'firebase', label: 'Firebase DB', icon: Flame, badge: undefined, badgeColor: '', desc: 'Firestore sync & configuration' },
-  ] as const;
+  ], [pendingCount, pendingTaskCount, pendingPrizeClaimCount, tasksList.length, usersList.length]);
 
   return (
     <div className={`min-h-screen bg-[#070A12] text-slate-100 pb-24 p-3 sm:p-5 max-w-7xl mx-auto space-y-4 antialiased font-sans transition-all duration-300 ${isMenuOpen ? 'lg:pl-84' : ''}`}>
@@ -1806,8 +1905,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredSubmissions.map((sub, sIdx) => {
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {paginatedSubmissions.map((sub, sIdx) => {
                 const isPending = sub.status === 'pending_approval';
                 const isApproved = sub.status === 'approved';
                 const isRejected = sub.status === 'rejected';
@@ -2190,6 +2290,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                 );
               })}
             </div>
+
+            {/* Fast Pagination for Task Submissions */}
+            {totalSubPages > 1 && (
+              <div className="flex items-center justify-between gap-3 bg-[#0E1524] p-3 rounded-2xl border border-slate-800 text-xs text-slate-300">
+                <div className="text-[11px] text-slate-400">
+                  Showing <strong className="text-white">{(subPage - 1) * SUB_PER_PAGE + 1}</strong> - <strong className="text-white">{Math.min(subPage * SUB_PER_PAGE, filteredSubmissions.length)}</strong> of <strong className="text-white">{filteredSubmissions.length}</strong>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSubPage(p => Math.max(1, p - 1))}
+                    disabled={subPage === 1}
+                    className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-2 py-1 text-slate-300 font-mono text-xs font-bold">
+                    {subPage} / {totalSubPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSubPage(p => Math.min(totalSubPages, p + 1))}
+                    disabled={subPage === totalSubPages}
+                    className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+            </div>
           )}
         </div>
       )}
@@ -2239,8 +2370,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
               <p className="text-xs text-slate-500 mt-1">Users will submit address claims from Refer Prize Pool</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {filteredPrizeClaims.map((claim) => {
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+              {paginatedPrizeClaims.map((claim) => {
                 const isPending = claim.status === 'pending' || claim.status === 'submitted';
                 const isApproved = claim.status === 'approved';
                 const isRejected = claim.status === 'rejected';
@@ -2337,6 +2469,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                 );
               })}
             </div>
+
+            {/* Fast Pagination for Prize Claims */}
+            {totalClaimPages > 1 && (
+              <div className="flex items-center justify-between gap-3 bg-[#0E1524] p-3 rounded-2xl border border-slate-800 text-xs text-slate-300">
+                <div className="text-[11px] text-slate-400">
+                  Showing <strong className="text-white">{(claimPage - 1) * CLAIMS_PER_PAGE + 1}</strong> - <strong className="text-white">{Math.min(claimPage * CLAIMS_PER_PAGE, filteredPrizeClaims.length)}</strong> of <strong className="text-white">{filteredPrizeClaims.length}</strong>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setClaimPage(p => Math.max(1, p - 1))}
+                    disabled={claimPage === 1}
+                    className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-2 py-1 text-slate-300 font-mono text-xs font-bold">
+                    {claimPage} / {totalClaimPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setClaimPage(p => Math.min(totalClaimPages, p + 1))}
+                    disabled={claimPage === totalClaimPages}
+                    className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+            </div>
           )}
         </div>
       )}
@@ -2423,7 +2586,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredWithdrawals.map((w, wIdx) => (
+              {paginatedWithdrawals.map((w, wIdx) => {
+                const associatedUser = usersMap.get(w.userId);
+                const userIp = w.ipAddress || associatedUser?.lastIp || '127.0.0.1';
+                const userNet = w.networkType || associatedUser?.networkType || '4G/Wi-Fi';
+                const userDev = w.deviceId || associatedUser?.deviceId || '';
+
+                return (
                 <div
                   key={w.id ? `admin-with-${w.id}-${wIdx}` : `admin-with-${wIdx}`}
                   className="bg-[#0E1524] rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-slate-700"
@@ -2453,7 +2622,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                       <span><strong className="text-white">{w.userName}</strong> ({w.userEmail})</span>
                       <button
                         onClick={() => {
-                          const userFound = usersList.find(u => u.uid === w.userId) || {
+                          const userFound = associatedUser || {
                             uid: w.userId,
                             email: w.userEmail,
                             displayName: w.userName,
@@ -2508,24 +2677,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                       <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#070A12] border border-slate-800 text-slate-300 font-mono">
                           <Globe className="w-3 h-3 text-cyan-400 shrink-0" />
-                          <span>IP: <strong className="text-white select-all">{w.ipAddress || (usersList.find(u => u.uid === w.userId)?.lastIp) || '127.0.0.1'}</strong></span>
+                          <span>IP: <strong className="text-white select-all">{userIp}</strong></span>
                         </span>
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#070A12] border border-slate-800 text-slate-300">
                           <Wifi className="w-3 h-3 text-indigo-400 shrink-0" />
-                          <span>Net: <strong className="text-white">{w.networkType || (usersList.find(u => u.uid === w.userId)?.networkType) || '4G/Wi-Fi'}</strong></span>
+                          <span>Net: <strong className="text-white">{userNet}</strong></span>
                         </span>
-                        {(w.deviceId || usersList.find(u => u.uid === w.userId)?.deviceId) && (
+                        {userDev && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#070A12] border border-slate-800 text-slate-300 font-mono">
                             <Smartphone className="w-3 h-3 text-amber-400 shrink-0" />
-                            <span>Device: <strong className="text-white">{((w.deviceId || usersList.find(u => u.uid === w.userId)?.deviceId) || '').substring(0, 16)}...</strong></span>
+                            <span>Device: <strong className="text-white">{userDev.substring(0, 16)}...</strong></span>
                           </span>
                         )}
                       </div>
 
                       {/* Multi-Account / Same IP Detection Warning */}
                       {(() => {
-                        const targetIp = (w.ipAddress || usersList.find(u => u.uid === w.userId)?.lastIp || '').trim();
-                        const targetDev = (w.deviceId || usersList.find(u => u.uid === w.userId)?.deviceId || '').trim();
+                        const targetIp = userIp.trim();
+                        const targetDev = userDev.trim();
                         const sameIpUsers = targetIp && targetIp !== '127.0.0.1' ? (usersByIpMap[targetIp] || []) : [];
                         const sameDevUsers = targetDev ? (usersByDeviceMap[targetDev] || []) : [];
                         const isDuplicate = sameIpUsers.length > 1 || sameDevUsers.length > 1;
@@ -2601,7 +2770,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                     </button>
                   </div>
                 </div>
-              ))}
+              );
+              })}
+
+              {/* Fast Pagination Controls */}
+              {totalWithPages > 1 && (
+                <div className="flex items-center justify-between gap-3 bg-[#0E1524] p-3 rounded-2xl border border-slate-800 text-xs text-slate-300">
+                  <div className="text-[11px] text-slate-400">
+                    Showing <strong className="text-white">{(withPage - 1) * WITH_PER_PAGE + 1}</strong> - <strong className="text-white">{Math.min(withPage * WITH_PER_PAGE, filteredWithdrawals.length)}</strong> of <strong className="text-white">{filteredWithdrawals.length}</strong>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWithPage(p => Math.max(1, p - 1))}
+                      disabled={withPage === 1}
+                      className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                    >
+                      Prev
+                    </button>
+                    <span className="px-2 py-1 text-slate-300 font-mono text-xs font-bold">
+                      {withPage} / {totalWithPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setWithPage(p => Math.min(totalWithPages, p + 1))}
+                      disabled={withPage === totalWithPages}
+                      className="px-3 py-1.5 rounded-xl bg-[#070A12] border border-slate-700/80 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2894,7 +3094,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u, uIdx) => {
+                    paginatedUsers.map((u, uIdx) => {
                     const reqCount = u.requiredTasksForWithdrawal !== undefined ? u.requiredTasksForWithdrawal : 3;
                     const compCount = u.completedTasksCount || 0;
                     const usedCount = u.tasksUsedForWithdrawal || 0;
@@ -3094,9 +3294,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           </button>
                           <button
                             onClick={async () => {
-                              await toggleUserVerified(u.uid, !u.isVerified);
+                              const nextVal = !u.isVerified;
+                              setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isVerified: nextVal } : usr));
                               sound.playWin();
-                              await loadData();
+                              try {
+                                await toggleUserVerified(u.uid, nextVal);
+                              } catch (err) {
+                                console.error('Toggle verified failed:', err);
+                                setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isVerified: !nextVal } : usr));
+                              }
                             }}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer ${
                               u.isVerified
@@ -3134,8 +3340,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           </button>
                           <button
                             onClick={async () => {
-                              await toggleUserBan(u.uid, !u.isBanned);
-                              await loadData();
+                              const nextBan = !u.isBanned;
+                              setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isBanned: nextBan } : usr));
+                              sound.playTick();
+                              try {
+                                await toggleUserBan(u.uid, nextBan);
+                              } catch (err) {
+                                console.error('Toggle ban failed:', err);
+                                setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isBanned: !nextBan } : usr));
+                              }
                             }}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
                               u.isBanned
@@ -3153,6 +3366,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
               </tbody>
               </table>
             </div>
+
+            {/* Fast Pagination for Users Table */}
+            {totalUserPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-[#070A12] border-t border-slate-800 text-xs text-slate-300">
+                <div className="text-[11px] text-slate-400">
+                  Showing <strong className="text-white">{(usersPage - 1) * USERS_PER_PAGE + 1}</strong> - <strong className="text-white">{Math.min(usersPage * USERS_PER_PAGE, filteredUsers.length)}</strong> of <strong className="text-white">{filteredUsers.length}</strong> registered users
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setUsersPage(1)}
+                    disabled={usersPage === 1}
+                    className="px-2.5 py-1 rounded-lg bg-[#0E1524] border border-slate-700 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                    title="First Page"
+                  >
+                    « First
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUsersPage(p => Math.max(1, p - 1))}
+                    disabled={usersPage === 1}
+                    className="px-3 py-1 rounded-lg bg-[#0E1524] border border-slate-700 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-2 py-1 text-amber-300 font-mono text-xs font-bold bg-[#0E1524] rounded-lg border border-slate-800">
+                    Page {usersPage} of {totalUserPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUsersPage(p => Math.min(totalUserPages, p + 1))}
+                    disabled={usersPage === totalUserPages}
+                    className="px-3 py-1 rounded-lg bg-[#0E1524] border border-slate-700 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                  >
+                    Next
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUsersPage(totalUserPages)}
+                    disabled={usersPage === totalUserPages}
+                    className="px-2.5 py-1 rounded-lg bg-[#0E1524] border border-slate-700 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer font-bold text-xs"
+                    title="Last Page"
+                  >
+                    Last »
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
