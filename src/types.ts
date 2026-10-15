@@ -93,6 +93,7 @@ export type TransactionType =
 export interface FeatureToggles {
   showGiveaway: boolean;
   showTournaments: boolean;
+  blockVpn?: boolean;
   updatedAt?: number;
 }
 

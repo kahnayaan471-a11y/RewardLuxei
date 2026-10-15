@@ -16,11 +16,14 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
-  ShieldAlert
+  ShieldAlert,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { sound } from '../utils/sound';
-import { checkIsVpn, VpnCheckResult } from '../utils/vpnDetector';
+import { checkIsVpn, clearVpnCache, VpnCheckResult } from '../utils/vpnDetector';
+import { subscribeToFeatureToggles, DEFAULT_FEATURE_TOGGLES } from '../services/coinService';
+import { FeatureToggles } from '../types';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -40,9 +43,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState('');
   const [detectedVpn, setDetectedVpn] = useState<VpnCheckResult | null>(null);
+  const [recheckingVpn, setRecheckingVpn] = useState(false);
+  const [featureToggles, setFeatureToggles] = useState<FeatureToggles>(DEFAULT_FEATURE_TOGGLES);
+
+  // Subscribe to feature toggles (Admin anti-vpn setting)
+  useEffect(() => {
+    const unsub = subscribeToFeatureToggles((toggles) => {
+      setFeatureToggles(toggles);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && featureToggles.blockVpn !== false) {
       checkIsVpn()
         .then((res) => {
           if (res.isVpn) {
@@ -52,8 +65,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           }
         })
         .catch(() => {});
+    } else {
+      setDetectedVpn(null);
     }
-  }, [isOpen]);
+  }, [isOpen, featureToggles.blockVpn]);
+
+  const handleRecheckVpn = async () => {
+    setRecheckingVpn(true);
+    clearVpnCache();
+    sound.playTick();
+    try {
+      const res = await checkIsVpn(true);
+      if (res.isVpn) {
+        setDetectedVpn(res);
+        setErrorMsg('VPN connection abhi bhi active hai! Kripya phone se VPN band karein.');
+        sound.playError();
+      } else {
+        setDetectedVpn(null);
+        setErrorMsg('');
+        sound.playWin();
+      }
+    } catch {
+      setErrorMsg('Check karne me network issue aaya.');
+    } finally {
+      setRecheckingVpn(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -95,17 +132,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setResetSuccessMsg('');
 
     // Strict Anti-VPN Inspection: Block login/signup if user is behind a VPN or Proxy
-    try {
-      const vpnStatus = await checkIsVpn(true);
-      if (vpnStatus.isVpn) {
-        setDetectedVpn(vpnStatus);
-        setErrorMsg('🚫 VPN Connection Detected! VPN ya Proxy lagakar login ya sign up karna strictly prohibited hai. Kripya apna VPN disconnect karein aur dobara try karein.');
-        sound.playError();
-        setLoading(false);
-        return;
+    if (featureToggles.blockVpn !== false) {
+      try {
+        const vpnStatus = await checkIsVpn(true);
+        if (vpnStatus.isVpn) {
+          setDetectedVpn(vpnStatus);
+          setErrorMsg('🚫 VPN Connection Detected! VPN ya Proxy lagakar login ya sign up karna strictly prohibited hai. Kripya apna VPN disconnect karein aur dobara try karein.');
+          sound.playError();
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // Continue if network timeout
       }
-    } catch {
-      // Continue if network timeout
     }
 
     try {
@@ -183,15 +222,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Live Anti-VPN Detection Warning Banner */}
-        {detectedVpn?.isVpn && (
-          <div className="mb-4 p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl text-xs text-rose-900 space-y-1.5 text-left shadow-sm">
-            <div className="flex items-center gap-2 font-black">
-              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>VPN Connection Detected ({detectedVpn.ip})</span>
+        {detectedVpn?.isVpn && featureToggles.blockVpn !== false && (
+          <div className="mb-4 p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl text-xs text-rose-900 space-y-2 text-left shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 font-black text-rose-700">
+                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>VPN / Proxy Blocked</span>
+              </div>
+              <span className="font-mono text-[10px] bg-rose-200/80 text-rose-900 px-2 py-0.5 rounded-md font-bold">
+                {detectedVpn.ip}
+              </span>
             </div>
-            <p className="text-[11px] text-rose-700 leading-tight">
-              Aapka VPN / Proxy on hai. Security firewall ki wajah se VPN lagakar login ya sign up karna allowed nahi hai. Kripya pehle VPN disconnect karein.
+            <p className="text-[11px] text-rose-800 leading-tight">
+              Aapka VPN / Proxy on hai. VPN lagakar login ya sign up karna strictly blocked hai. Kripya apne phone se VPN band karein.
             </p>
+            <button
+              type="button"
+              onClick={handleRecheckVpn}
+              disabled={recheckingVpn}
+              className="w-full py-1.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {recheckingVpn ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Checking Connection...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>VPN Disconnect Kiya? Recheck Karein</span>
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -445,11 +507,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-display font-extrabold text-sm rounded-xl shadow-md shadow-amber-500/25 transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer disabled:opacity-50"
+              disabled={loading || (!!detectedVpn?.isVpn && featureToggles.blockVpn !== false)}
+              className={`w-full py-3 px-4 font-display font-extrabold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer disabled:opacity-60 ${
+                detectedVpn?.isVpn && featureToggles.blockVpn !== false
+                  ? 'bg-rose-500 text-white cursor-not-allowed'
+                  : 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 shadow-amber-500/25'
+              }`}
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : detectedVpn?.isVpn && featureToggles.blockVpn !== false ? (
+                <>
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>VPN Active - Disconnect to Continue</span>
+                </>
               ) : (
                 <>
                   <span>{mode === 'login' ? 'Login to Account' : 'Create My Account'}</span>

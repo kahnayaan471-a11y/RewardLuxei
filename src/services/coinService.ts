@@ -5062,6 +5062,7 @@ export async function cancelTournamentAndRefund(
 export const DEFAULT_FEATURE_TOGGLES: FeatureToggles = {
   showGiveaway: true,
   showTournaments: true,
+  blockVpn: true,
 };
 
 const FEATURE_TOGGLES_LOCAL_KEY = 'rewardluxe_feature_toggles';
@@ -5075,6 +5076,7 @@ export function getLocalFeatureToggles(): FeatureToggles {
       return {
         showGiveaway: parsed.showGiveaway !== false,
         showTournaments: parsed.showTournaments !== false,
+        blockVpn: parsed.blockVpn !== false,
         updatedAt: parsed.updatedAt
       };
     }
@@ -5098,6 +5100,7 @@ export async function fetchFeatureToggles(): Promise<FeatureToggles> {
       const merged: FeatureToggles = {
         showGiveaway: data.showGiveaway !== false,
         showTournaments: data.showTournaments !== false,
+        blockVpn: data.blockVpn !== false,
         updatedAt: data.updatedAt || Date.now()
       };
       setLocalFeatureToggles(merged);
@@ -5134,6 +5137,7 @@ export function subscribeToFeatureToggles(
           const merged: FeatureToggles = {
             showGiveaway: data.showGiveaway !== false,
             showTournaments: data.showTournaments !== false,
+            blockVpn: data.blockVpn !== false,
             updatedAt: data.updatedAt
           };
           setLocalFeatureToggles(merged);

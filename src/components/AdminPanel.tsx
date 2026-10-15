@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from 'r
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield,
+  ShieldAlert,
   CreditCard,
   Users,
   BarChart3,
@@ -14,6 +15,7 @@ import {
   DollarSign,
   AlertCircle,
   Ban,
+  Lock,
   UserCheck,
   PlusCircle,
   MinusCircle,
@@ -133,6 +135,7 @@ import {
 import { VerifiedBadge } from './VerifiedBadge';
 import { sound } from '../utils/sound';
 import { handleAvatarError, handleTaskLogoError, handleScreenshotError } from '../utils/imageFallback';
+import { checkIsVpn, VpnCheckResult } from '../utils/vpnDetector';
 
 // Preset avatars for Admin quick assignment
 const ADMIN_AVATAR_PRESETS = [
@@ -155,9 +158,9 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'withdrawals' | 'task_proofs' | 'prize_claims' | 'tasks' | 'tournaments' | 'promo_codes' | 'giveaway' | 'users' | 'analytics' | 'firebase'>('withdrawals');
+  const [activeTab, setActiveTab] = useState<'withdrawals' | 'task_proofs' | 'prize_claims' | 'security' | 'tasks' | 'tournaments' | 'promo_codes' | 'giveaway' | 'users' | 'analytics' | 'firebase'>('withdrawals');
   const [loading, setLoading] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(() => typeof window !== 'undefined' ? window.innerWidth >= 1280 : false);
 
   // Data States
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -220,7 +223,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     };
   }, []);
 
-  const handleToggleFeature = async (featureKey: 'showGiveaway' | 'showTournaments') => {
+  const handleToggleFeature = async (featureKey: 'showGiveaway' | 'showTournaments' | 'blockVpn') => {
     try {
       setTogglingFeature(featureKey);
       const nextVal = !featureToggles[featureKey];
@@ -232,6 +235,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
       console.error('Error toggling feature:', err);
     } finally {
       setTogglingFeature(null);
+    }
+  };
+
+  // Anti-VPN Security Diagnostic States
+  const [testIpInput, setTestIpInput] = useState<string>('');
+  const [testVpnLoading, setTestVpnLoading] = useState<boolean>(false);
+  const [testVpnResult, setTestVpnResult] = useState<VpnCheckResult | null>(null);
+
+  const handleTestIpVpn = async (targetIp?: string) => {
+    setTestVpnLoading(true);
+    sound.playTick();
+    try {
+      const queryParam = targetIp || testIpInput.trim();
+      const url = queryParam ? `/api/check-vpn?ip=${encodeURIComponent(queryParam)}` : `/api/check-vpn`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        setTestVpnResult({
+          isVpn: !!data.isVpn,
+          ip: data.ip || '127.0.0.1',
+          reason: data.reason || (data.isVpn ? 'VPN/Proxy Detected' : 'Residential Clean IP'),
+          country: data.country,
+          countryCode: data.countryCode,
+          isp: data.isp,
+          org: data.org,
+          checkedAt: Date.now()
+        });
+        if (data.isVpn) {
+          sound.playError();
+        } else {
+          sound.playWin();
+        }
+      }
+    } catch (e) {
+      console.warn('Test IP check error:', e);
+    } finally {
+      setTestVpnLoading(false);
     }
   };
 
@@ -277,6 +317,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const [editIsVerified, setEditIsVerified] = useState<boolean>(false);
   const [editProfileLoading, setEditProfileLoading] = useState<boolean>(false);
   const [editProfileMsg, setEditProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Active User Details & Complete Controls Modal
+  const [selectedUserDetail, setSelectedUserDetail] = useState<UserProfile | null>(null);
+  const [detailCustomCoins, setDetailCustomCoins] = useState<number>(500);
+  const [detailCustomReason, setDetailCustomReason] = useState<string>('Admin bonus');
+  const [detailActionLoading, setDetailActionLoading] = useState<boolean>(false);
 
   // User Coin History & Audit View State
   const [historyUser, setHistoryUser] = useState<UserProfile | null>(null);
@@ -418,6 +464,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     return map;
   }, [usersList]);
 
+  // Keep selectedUserDetail synced with live usersList updates
+  const activeUserDetail = useMemo(() => {
+    if (!selectedUserDetail) return null;
+    return usersMap.get(selectedUserDetail.uid) || selectedUserDetail;
+  }, [selectedUserDetail, usersMap]);
+
+  // Quick Coin Adjust inside User Details Modal (Instant Optimistic Update)
+  const handleQuickAdjustCoinsInModal = async (u: UserProfile, delta: number, customReason?: string) => {
+    const finalReason = customReason || (delta > 0 ? `Admin bonus (+${delta} coins)` : `Admin deduction (${delta} coins)`);
+    setUsersList(prev => prev.map(user => user.uid === u.uid ? {
+      ...user,
+      coins: Math.max(0, (user.coins || 0) + delta)
+    } : user));
+    if (delta > 0) sound.playCoinSound(); else sound.playTick();
+    try {
+      await adminAdjustUserCoins(u.uid, delta, finalReason);
+    } catch (err) {
+      console.error('Failed to adjust coins:', err);
+    }
+  };
+
+  // Quick Referral Adjust inside User Details Modal (Instant Optimistic Update)
+  const handleQuickAdjustRefsInModal = async (u: UserProfile, delta: number) => {
+    const reason = delta > 0 ? `Admin referral addition (+${delta})` : `Admin referral deduction (${delta})`;
+    setUsersList(prev => prev.map(user => user.uid === u.uid ? {
+      ...user,
+      referralCount: Math.max(0, (user.referralCount || 0) + delta)
+    } : user));
+    sound.playWin();
+    try {
+      await adminAdjustUserReferrals(u.uid, delta, reason);
+    } catch (err) {
+      console.error('Failed to adjust referrals:', err);
+    }
+  };
+
   // Filtered withdrawals (Memoized for high performance)
   const filteredWithdrawals = useMemo(() => {
     return withdrawals.filter(w => {
@@ -504,6 +586,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const usersByIpMap = useMemo(() => {
     const map: Record<string, UserProfile[]> = {};
     usersList.forEach(u => {
+      if (!u) return;
       const ip = (u.lastIp || '').trim();
       if (ip && ip !== '127.0.0.1' && ip !== 'localhost') {
         if (!map[ip]) map[ip] = [];
@@ -517,6 +600,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const usersByDeviceMap = useMemo(() => {
     const map: Record<string, UserProfile[]> = {};
     usersList.forEach(u => {
+      if (!u) return;
       const dev = (u.deviceId || '').trim();
       if (dev) {
         if (!map[dev]) map[dev] = [];
@@ -530,6 +614,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
   const multiAccountUsersCount = useMemo(() => {
     let count = 0;
     usersList.forEach(u => {
+      if (!u) return;
       const hasDupIp = u.lastIp && (usersByIpMap[u.lastIp]?.length || 0) > 1;
       const hasDupDev = u.deviceId && (usersByDeviceMap[u.deviceId]?.length || 0) > 1;
       if (hasDupIp || hasDupDev) count++;
@@ -539,12 +624,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
 
   // Count users with active Blue Tick (Verified Badge)
   const verifiedUsersCount = useMemo(() => {
-    return usersList.filter(u => !!u.isVerified).length;
+    return usersList.filter(u => u && !!u.isVerified).length;
   }, [usersList]);
 
   // Filtered users (Memoized for high performance)
   const filteredUsers = useMemo(() => {
     return usersList.filter(u => {
+      if (!u) return false;
       if (onlySameIpFilter) {
         const hasDupIp = u.lastIp && (usersByIpMap[u.lastIp]?.length || 0) > 1;
         const hasDupDev = u.deviceId && (usersByDeviceMap[u.deviceId]?.length || 0) > 1;
@@ -1338,6 +1424,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
     { id: 'withdrawals', label: 'Withdrawals', icon: CreditCard, badge: pendingCount, badgeColor: 'bg-rose-500 text-white', desc: 'Payout requests & approvals' },
     { id: 'task_proofs', label: 'Task Proofs', icon: FileCheck, badge: pendingTaskCount, badgeColor: 'bg-amber-500 text-slate-950', desc: 'Screenshot proofs review' },
     { id: 'prize_claims', label: 'Prize Claims', icon: Gift, badge: pendingPrizeClaimCount, badgeColor: 'bg-amber-500 text-slate-950', desc: 'Physical reward claims' },
+    { id: 'security', label: 'Anti-VPN Shield', icon: ShieldAlert, badge: undefined, badgeColor: '', desc: 'VPN & Proxy Blocker Wall' },
     { id: 'tasks', label: 'Tasks', icon: ListTodo, badge: tasksList.length, badgeColor: 'bg-slate-800 text-slate-300', desc: 'Manage earn offers & apps' },
     { id: 'promo_codes', label: 'Promo Codes', icon: Ticket, badge: undefined, badgeColor: '', desc: 'Bonus coupons & redeem codes' },
     { id: 'giveaway', label: 'Giveaways', icon: Gift, badge: undefined, badgeColor: '', desc: 'Daily & weekly prize draws' },
@@ -1518,6 +1605,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                 {featureToggles.showTournaments ? 'ON' : 'OFF'}
               </div>
             </button>
+
+            {/* Anti-VPN Shield Live Toggle */}
+            <button
+              type="button"
+              onClick={() => handleToggleFeature('blockVpn')}
+              disabled={togglingFeature === 'blockVpn'}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2.5 transition-all border cursor-pointer active:scale-95 shadow-md ${
+                featureToggles.blockVpn !== false
+                  ? 'bg-rose-500/20 border-rose-400/60 text-rose-300 hover:bg-rose-500/30'
+                  : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:bg-slate-800'
+              }`}
+              title="Click to toggle strict Anti-VPN & Proxy blocking"
+            >
+              <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                featureToggles.blockVpn !== false ? 'bg-rose-500 text-white shadow-sm' : 'bg-slate-800 text-slate-400'
+              }`}>
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <div className="text-[10px] text-slate-400 leading-tight">Anti-VPN Shield</div>
+                <div className="flex items-center gap-1.5 font-bold">
+                  {featureToggles.blockVpn !== false ? (
+                    <>
+                      <span className="text-rose-300">Active</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-slate-400">Disabled</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className={`px-2 py-0.5 rounded-lg text-[10px] uppercase font-black tracking-wider ${
+                featureToggles.blockVpn !== false
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                {featureToggles.blockVpn !== false ? 'BLOCKED' : 'OFF'}
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -1561,8 +1690,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
         </button>
 
         <button
-          onClick={() => setActiveTab('users')}
-          className="bg-[#0E1524] hover:bg-[#131B2E] border border-slate-800/90 hover:border-cyan-500/40 p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer text-left group shadow-lg"
+          onClick={() => {
+            setActiveTab('users');
+            sound.playTick();
+          }}
+          className="bg-[#0E1524] hover:bg-[#131B2E] border border-slate-800/90 hover:border-cyan-500/40 p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer text-left group shadow-lg active:scale-98"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Total Users</span>
@@ -1579,8 +1711,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
         </button>
 
         <button
-          onClick={() => setActiveTab('analytics')}
-          className="bg-[#0E1524] hover:bg-[#131B2E] border border-slate-800/90 hover:border-emerald-500/40 p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer text-left group shadow-lg"
+          onClick={() => {
+            setActiveTab('analytics');
+            sound.playTick();
+          }}
+          className="bg-[#0E1524] hover:bg-[#131B2E] border border-slate-800/90 hover:border-emerald-500/40 p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer text-left group shadow-lg active:scale-98"
         >
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">System Coins</span>
@@ -1605,7 +1740,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id as typeof activeTab)}
+              onClick={() => {
+                setActiveTab(item.id as typeof activeTab);
+                sound.playTick();
+              }}
               className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer whitespace-nowrap ${
                 isActive
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-black shadow-md shadow-indigo-600/30'
@@ -1696,7 +1834,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                       key={item.id}
                       onClick={() => {
                         setActiveTab(item.id as typeof activeTab);
-                        // Stays open as requested! ("open hi rahe aysa banoo")
+                        sound.playTick();
+                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                          setIsMenuOpen(false);
+                        }
                       }}
                       className={`w-full p-2.5 rounded-xl flex items-center justify-between transition-all cursor-pointer text-left group ${
                         isActive
@@ -1963,13 +2104,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                       {/* User Info Bar with Verified Email */}
                       <div className="bg-[#070A12] p-3 rounded-xl border border-slate-800/80 space-y-2 text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                          <div
+                            onClick={() => {
+                              const userFound = usersList.find(u => u.uid === sub.userId) || {
+                                uid: sub.userId,
+                                email: sub.userEmail || '',
+                                displayName: sub.userName || 'User',
+                                coins: 0,
+                                totalEarned: 0,
+                                totalWithdrawn: 0,
+                                referralCode: '',
+                                referralCount: 0,
+                                role: 'user' as const,
+                                dailyStreak: 0,
+                                spinsLeftToday: 0,
+                                scratchesLeftToday: 0,
+                                captchasLeftToday: 0,
+                                createdAt: sub.submittedAt || Date.now()
+                              };
+                              setSelectedUserDetail(userFound);
+                              sound.playTick();
+                            }}
+                            className="flex items-center gap-2 min-w-0 cursor-pointer group/taskuser"
+                            title="Click to view & manage full user profile"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs group-hover/taskuser:ring-2 group-hover/taskuser:ring-amber-400 transition-all">
                               {sub.userName ? sub.userName.charAt(0).toUpperCase() : 'U'}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-display font-black text-white truncate text-sm">
-                                {sub.userName || 'User'}
+                              <p className="font-display font-black text-white truncate text-sm group-hover/taskuser:text-amber-400 transition-colors flex items-center gap-1">
+                                <span>{sub.userName || 'User'}</span>
+                                <ChevronRight className="w-3 h-3 text-slate-500 group-hover/taskuser:text-amber-400" />
                               </p>
                               <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium flex-wrap">
                                 <span className="text-purple-300 font-mono font-bold select-all truncate">
@@ -2409,7 +2574,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
 
                       <div className="text-xs text-slate-300 space-y-1">
                         <div>
-                          <strong className="text-white">Winner:</strong> {claim.userName}{' '}
+                          <strong className="text-white">Winner:</strong>{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const userFound = usersMap.get(claim.userId) || {
+                                uid: claim.userId,
+                                email: claim.userPhone || '',
+                                displayName: claim.userName,
+                                coins: 0,
+                                totalEarned: 0,
+                                totalWithdrawn: 0,
+                                referralCode: '',
+                                referralCount: 0,
+                                role: 'user' as const,
+                                dailyStreak: 0,
+                                spinsLeftToday: 0,
+                                scratchesLeftToday: 0,
+                                captchasLeftToday: 0,
+                                createdAt: claim.claimedAt || Date.now()
+                              };
+                              setSelectedUserDetail(userFound);
+                              sound.playTick();
+                            }}
+                            className="font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2 cursor-pointer inline-flex items-center gap-1"
+                            title="Click to view & manage winner account details"
+                          >
+                            <span>{claim.userName}</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>{' '}
                           <span className="text-slate-400 font-mono">({claim.userPhone || 'No Phone'})</span>
                         </div>
                         <div className="text-slate-400 flex items-center gap-1">
@@ -2619,7 +2812,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                     </div>
 
                     <div className="text-xs text-slate-300 flex items-center gap-2 flex-wrap">
-                      <span><strong className="text-white">{w.userName}</strong> ({w.userEmail})</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const userFound = associatedUser || {
+                            uid: w.userId,
+                            email: w.userEmail,
+                            displayName: w.userName,
+                            coins: w.coins,
+                            totalEarned: w.coins,
+                            totalWithdrawn: 0,
+                            referralCode: '',
+                            referralCount: 0,
+                            role: 'user' as const,
+                            dailyStreak: 0,
+                            spinsLeftToday: 0,
+                            scratchesLeftToday: 0,
+                            captchasLeftToday: 0,
+                            createdAt: w.createdAt
+                          };
+                          setSelectedUserDetail(userFound);
+                          sound.playTick();
+                        }}
+                        className="font-bold text-white hover:text-amber-400 cursor-pointer inline-flex items-center gap-1.5 transition-colors p-1 rounded-lg hover:bg-slate-800 text-left"
+                        title="Click to view & manage user profile"
+                      >
+                        <User className="w-3.5 h-3.5 text-amber-400" />
+                        <span><strong>{w.userName}</strong> ({w.userEmail})</span>
+                        <ChevronRight className="w-3 h-3 text-slate-500" />
+                      </button>
                       <button
                         onClick={() => {
                           const userFound = associatedUser || {
@@ -3095,6 +3316,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                     </tr>
                   ) : (
                     paginatedUsers.map((u, uIdx) => {
+                    if (!u) return null;
                     const reqCount = u.requiredTasksForWithdrawal !== undefined ? u.requiredTasksForWithdrawal : 3;
                     const compCount = u.completedTasksCount || 0;
                     const usedCount = u.tasksUsedForWithdrawal || 0;
@@ -3102,45 +3324,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                     const isGatePassed = reqCount === 0 || availCount >= reqCount;
 
                     return (
-                      <tr key={u.uid ? `adm-user-${u.uid}-${uIdx}` : `adm-user-${uIdx}`} className="hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={u.uid ? `adm-user-${u.uid}-${uIdx}` : `adm-user-${uIdx}`}
+                        onClick={() => { setSelectedUserDetail(u); sound.playTick(); }}
+                        className="hover:bg-slate-800/60 cursor-pointer transition-colors group"
+                      >
                         <td className="p-3.5">
                           <div className="flex items-center gap-2.5">
-                            {/* User Avatar with 1-click edit */}
+                            {/* User Avatar with 1-click open details */}
                             <div
-                              onClick={() => openEditProfileModal(u)}
-                              className="relative group cursor-pointer shrink-0"
-                              title="Click to edit Name or Profile Picture"
+                              onClick={(e) => { e.stopPropagation(); setSelectedUserDetail(u); sound.playTick(); }}
+                              className="relative group/avatar cursor-pointer shrink-0"
+                              title="Click to view & manage full user profile"
                             >
                               {u.photoURL ? (
                                 <img
                                   src={u.photoURL}
                                   alt={u.displayName || 'User'}
-                                  className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-2xs group-hover:ring-2 group-hover:ring-amber-400 transition-all bg-slate-900"
+                                  className="w-10 h-10 rounded-xl object-cover border border-slate-700 shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-amber-400 transition-all bg-slate-900"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => handleAvatarError(e, u.displayName || 'User', u.uid)}
                                 />
                               ) : (
-                                <div className="w-10 h-10 rounded-xl bg-purple-900 text-purple-200 font-black text-sm flex items-center justify-center border border-purple-700 group-hover:ring-2 group-hover:ring-amber-400 transition-all shadow-2xs">
+                                <div className="w-10 h-10 rounded-xl bg-purple-900 text-purple-200 font-black text-sm flex items-center justify-center border border-purple-700 group-hover/avatar:ring-2 group-hover/avatar:ring-amber-400 transition-all shadow-2xs">
                                   {(u.displayName || 'U').charAt(0).toUpperCase()}
                                 </div>
                               )}
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs">
-                                <Edit3 className="w-2.5 h-2.5 stroke-[3]" />
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity shadow-xs">
+                                <ChevronRight className="w-2.5 h-2.5 stroke-[3]" />
                               </div>
                             </div>
 
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 font-bold text-white">
                                 <span
-                                  onClick={() => openEditProfileModal(u)}
-                                  className="truncate hover:text-amber-400 cursor-pointer"
-                                  title="Click to edit Name"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedUserDetail(u); sound.playTick(); }}
+                                  className="truncate hover:text-amber-400 cursor-pointer group-hover:text-amber-300 transition-colors"
+                                  title="Click to view & manage user details"
                                 >
                                   {u.displayName || 'Unnamed User'}
                                 </span>
                                 {u.isVerified && <VerifiedBadge size="xs" />}
                                 <button
-                                  onClick={() => openEditProfileModal(u)}
+                                  onClick={(e) => { e.stopPropagation(); openEditProfileModal(u); }}
                                   className="text-slate-400 hover:text-amber-400 p-0.5 rounded transition-colors cursor-pointer"
                                   title="Edit Name & Photo"
                                 >
@@ -3148,6 +3374,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                                 </button>
                               </div>
                               <div className="text-[11px] text-slate-400 truncate font-mono">{u.email}</div>
+                              <div className="mt-1 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setSelectedUserDetail(u); sound.playTick(); }}
+                                  className="px-2 py-0.5 rounded-md bg-indigo-500/15 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                  title="Open complete user control sheet"
+                                >
+                                  <User className="w-2.5 h-2.5 text-indigo-400" />
+                                  <span>View User</span>
+                                  <ChevronRight className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -3205,21 +3443,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                               {availCount} Avail ({compCount} done)
                             </span>
                             <button
-                              onClick={() => handleQuickAdjustTasks(u, 1)}
+                              onClick={(e) => { e.stopPropagation(); handleQuickAdjustTasks(u, 1); }}
                               className="w-5 h-5 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 border border-emerald-700/60 rounded flex items-center justify-center font-black text-xs transition-colors cursor-pointer active:scale-90"
                               title="Add +1 completed task for this user"
                             >
                               +
                             </button>
                             <button
-                              onClick={() => handleQuickAdjustTasks(u, -1)}
+                              onClick={(e) => { e.stopPropagation(); handleQuickAdjustTasks(u, -1); }}
                               className="w-5 h-5 bg-rose-900/60 hover:bg-rose-800 text-rose-300 border border-rose-700/60 rounded flex items-center justify-center font-black text-xs transition-colors cursor-pointer active:scale-90"
                               title="Minus -1 completed task for this user"
                             >
                               -
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setReqEditUser(u);
                                 setReqRequiredCount(reqCount);
                                 setReqCompletedCount(compCount);
@@ -3238,7 +3477,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           <div className="flex items-center gap-1.5">
                             <span className="text-purple-300 font-bold">{u.referralCode}</span>
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setAdjustRefUser(u);
                                 setAdjustRefCount(1);
                                 setAdjustRefReason('Admin referral adjustment');
@@ -3275,9 +3515,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                           </div>
                         </td>
                         <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                          {/* PRIMARY VIEW / MANAGE USER BUTTON */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedUserDetail(u);
+                              sound.playTick();
+                            }}
+                            className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-lg text-[11px] transition-all inline-flex items-center gap-1 shadow-xs cursor-pointer active:scale-95"
+                            title="Click to view & manage complete user details"
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>View User</span>
+                          </button>
                           {/* EDIT NAME & PHOTO BUTTON */}
                           <button
-                            onClick={() => openEditProfileModal(u)}
+                            onClick={(e) => { e.stopPropagation(); openEditProfileModal(u); }}
                             className="px-2.5 py-1 bg-[#070A12] hover:bg-slate-800 text-slate-200 border border-slate-700/80 font-bold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1 shadow-2xs cursor-pointer"
                             title="Edit User Name and Profile Picture"
                           >
@@ -3285,7 +3538,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             <span>Edit Profile</span>
                           </button>
                           <button
-                            onClick={() => openUserHistoryModal(u)}
+                            onClick={(e) => { e.stopPropagation(); openUserHistoryModal(u); }}
                             className="px-2.5 py-1 bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 font-bold rounded-lg text-[11px] transition-colors inline-flex items-center gap-1 shadow-2xs cursor-pointer"
                             title="View detailed coin earning history & activity audit"
                           >
@@ -3293,7 +3546,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             <span>Coin History</span>
                           </button>
                           <button
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation();
                               const nextVal = !u.isVerified;
                               setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isVerified: nextVal } : usr));
                               sound.playWin();
@@ -3315,13 +3569,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             <span>{u.isVerified ? 'Remove Tick' : 'Verify Tick'}</span>
                           </button>
                           <button
-                            onClick={() => setAdjustUser(u)}
+                            onClick={(e) => { e.stopPropagation(); setAdjustUser(u); }}
                             className="px-2.5 py-1 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
                           >
                             ± Coins
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAdjustRefUser(u);
                               setAdjustRefCount(1);
                               setAdjustRefReason('Admin referral adjustment');
@@ -3332,14 +3587,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                             ± Referrals
                           </button>
                           <button
-                            onClick={() => handleResetSingleUser(u)}
+                            onClick={(e) => { e.stopPropagation(); handleResetSingleUser(u); }}
                             className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
                             title="Deduct/minus all coins and set referrals to 0 for this user"
                           >
                             Reset To 0
                           </button>
                           <button
-                            onClick={async () => {
+                            onClick={async (e) => {
+                              e.stopPropagation();
                               const nextBan = !u.isBanned;
                               setUsersList(prev => prev.map(usr => usr.uid === u.uid ? { ...usr, isBanned: nextBan } : usr));
                               sound.playTick();
@@ -3592,6 +3848,244 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: ANTI-VPN & SECURITY FIREWALL */}
+      {activeTab === 'security' && (
+        <div className="space-y-4">
+          {/* Main Master Control Banner */}
+          <div className={`p-5 sm:p-6 rounded-3xl border-2 transition-all relative overflow-hidden shadow-2xl ${
+            featureToggles.blockVpn !== false
+              ? 'bg-gradient-to-r from-rose-950/60 via-[#0E1524] to-[#0E1524] border-rose-500/60'
+              : 'bg-[#0E1524] border-slate-800'
+          }`}>
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+              <div className="flex items-start gap-4">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black shrink-0 shadow-lg ${
+                  featureToggles.blockVpn !== false
+                    ? 'bg-rose-500 text-white shadow-rose-600/30 border border-rose-400/40'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}>
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display font-black text-xl text-white">
+                      Anti-VPN &amp; Proxy Blocker Wall
+                    </h3>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                      featureToggles.blockVpn !== false
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${featureToggles.blockVpn !== false ? 'bg-rose-400 animate-pulse' : 'bg-slate-500'}`} />
+                      {featureToggles.blockVpn !== false ? 'FIREWALL ACTIVE • VPN USERS BLOCKED' : 'FIREWALL DISABLED • VPN ALLOWED'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                    Koi bhi user VPN (TurboVPN, QuickVPN, ExpressVPN, Proxy, Tor ya Datacenter IP) lagakar login, sign up ya app access nahi kar payega.
+                  </p>
+                </div>
+              </div>
+
+              {/* Master Toggle Button */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleFeature('blockVpn')}
+                  disabled={togglingFeature === 'blockVpn'}
+                  className={`px-5 py-3 rounded-2xl font-display font-black text-sm flex items-center justify-center gap-2.5 transition-all shadow-xl active:scale-95 cursor-pointer disabled:opacity-50 ${
+                    featureToggles.blockVpn !== false
+                      ? 'bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-slate-950 shadow-rose-500/20'
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  }`}
+                >
+                  <ShieldAlert className="w-5 h-5 shrink-0" />
+                  <span>
+                    {featureToggles.blockVpn !== false ? 'Turn OFF VPN Blocking' : 'Turn ON VPN Blocking'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Status Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-800/80 text-xs">
+              <div className="p-3.5 bg-[#070A12] rounded-2xl border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${featureToggles.blockVpn !== false ? 'bg-rose-400 animate-ping' : 'bg-slate-500'}`} />
+                  Login &amp; Sign Up Gate
+                </span>
+                <div className="font-bold text-white">
+                  {featureToggles.blockVpn !== false ? '🚫 VPN Login Blocked' : '✅ Open For Any IP'}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {featureToggles.blockVpn !== false
+                    ? 'Login & Signup buttons are blocked for VPN users with warning alert.'
+                    : 'Users can login from any IP address without restrictions.'}
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-[#070A12] rounded-2xl border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  Live App Access Screen
+                </span>
+                <div className="font-bold text-white">
+                  {featureToggles.blockVpn !== false ? '🛡️ Fullscreen Wall Active' : '🔓 Normal Screen'}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {featureToggles.blockVpn !== false
+                    ? 'Non-admin users see Anti-VPN Screen until VPN is turned off.'
+                    : 'No fullscreen block screen is triggered.'}
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-[#070A12] rounded-2xl border border-slate-800 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  Admin Portal Exemption
+                </span>
+                <div className="font-bold text-emerald-400">
+                  ⚡ Always Accessible
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Admin panel &amp; verified admin emails are never locked out by firewall.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Diagnostic IP & VPN Scanner Tool */}
+          <div className="bg-[#0E1524] p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h4 className="font-display font-black text-base text-white flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-cyan-400" />
+                  <span>IP &amp; VPN Connection Diagnostic Scanner</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Check any IP address or test your own device connection against the Anti-VPN detection engine.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleTestIpVpn()}
+                disabled={testVpnLoading}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+              >
+                {testVpnLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Scanning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span>Scan My Connection Now</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Custom IP input test form */}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <input
+                type="text"
+                value={testIpInput}
+                onChange={(e) => setTestIpInput(e.target.value)}
+                placeholder="Enter custom IP to test (e.g. 104.28.192.1 or user IP)..."
+                className="flex-1 w-full px-3.5 py-2.5 bg-[#070A12] border border-slate-700/80 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:border-amber-400 focus:outline-hidden"
+              />
+              <button
+                type="button"
+                onClick={() => handleTestIpVpn(testIpInput.trim())}
+                disabled={testVpnLoading || !testIpInput.trim()}
+                className="w-full sm:w-auto px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs transition-all cursor-pointer disabled:opacity-40"
+              >
+                Inspect IP
+              </button>
+            </div>
+
+            {/* Test Result Display */}
+            {testVpnResult && (
+              <div className={`p-4 rounded-2xl border-2 text-xs space-y-2 transition-all ${
+                testVpnResult.isVpn
+                  ? 'bg-rose-950/40 border-rose-500/60 text-rose-200'
+                  : 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200'
+              }`}>
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <div className="flex items-center gap-2 font-black text-sm">
+                    {testVpnResult.isVpn ? (
+                      <>
+                        <ShieldAlert className="w-5 h-5 text-rose-400" />
+                        <span className="text-rose-300">FLAGGED: VPN / Datacenter Connection Detected!</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        <span className="text-emerald-300">CLEAN: Residential / Mobile Network Verified</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="font-mono text-xs bg-black/40 px-2.5 py-0.5 rounded-lg font-bold">
+                    {testVpnResult.ip}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block font-bold">Detection Reason:</span>
+                    <strong className="text-white">{testVpnResult.reason || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-bold">ISP / Network:</span>
+                    <strong className="text-white">{testVpnResult.isp || 'Local / Unknown'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-bold">Location / Country:</span>
+                    <strong className="text-white">{testVpnResult.country || 'IN'} ({testVpnResult.countryCode || 'N/A'})</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Multi-Account & Same IP Accounts Audit */}
+          <div className="bg-[#0E1524] p-5 sm:p-6 rounded-3xl border border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h4 className="font-display font-black text-base text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  <span>Multi-Account &amp; Shared IP Detection</span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Users using identical IPs or proxy tunnels to create fake referral chains.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlySameIpFilter(true);
+                  setActiveTab('users');
+                  sound.playTick();
+                }}
+                className="px-3.5 py-2 bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-700/60 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+              >
+                <span>Filter Duplicate IP Users</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-[#070A12] rounded-2xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+              <strong className="text-amber-300 block mb-1">💡 Anti-Fraud Guidance:</strong>
+              Agar koi user alag-alag accounts banakar referral bonus lene ki koshish karta hai, to system unka IP address aur Device ID record karta hai. Aap Users tab me jakar kisi bhi user row par click karke unka live Network Fingerprint &amp; Multi-Account audit dekh sakte hain.
             </div>
           </div>
         </div>
@@ -5091,6 +5585,494 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout }) => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* COMPREHENSIVE USER DETAILS & INSTANT MANAGEMENT MODAL */}
+      <AnimatePresence>
+        {activeUserDetail && (
+          <div key="admin-user-detail-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              key="admin-user-detail-modal"
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="bg-[#0E1524] text-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-indigo-500/30 overflow-hidden my-auto"
+            >
+              {/* Modal Top Banner & Identity Header */}
+              <div className="bg-[#070A12] p-5 sm:p-6 border-b border-slate-800 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-32 bg-gradient-to-bl from-indigo-600/15 via-purple-600/10 to-transparent blur-xl pointer-events-none" />
+                
+                <div className="flex items-start justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    {/* User Avatar with Verification ring */}
+                    <div className="relative shrink-0">
+                      {activeUserDetail.photoURL ? (
+                        <img
+                          src={activeUserDetail.photoURL}
+                          alt={activeUserDetail.displayName || 'User'}
+                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-slate-700 shadow-lg bg-slate-900"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => handleAvatarError(e, activeUserDetail.displayName || 'User', activeUserDetail.uid)}
+                        />
+                      ) : (
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-purple-800 to-indigo-600 text-white font-black text-2xl flex items-center justify-center border-2 border-purple-500/40 shadow-lg">
+                          {(activeUserDetail.displayName || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      {activeUserDetail.isVerified && (
+                        <div className="absolute -bottom-1 -right-1 bg-sky-500 text-white p-0.5 rounded-full shadow-md">
+                          <VerifiedBadge size="sm" showTooltip={false} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-display font-black text-lg sm:text-xl text-white truncate">
+                          {activeUserDetail.displayName || 'Unnamed User'}
+                        </h2>
+                        {activeUserDetail.isVerified && (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-sky-950/90 text-sky-300 font-black px-2 py-0.5 rounded-full border border-sky-600/60 shadow-xs">
+                            <VerifiedBadge size="xs" showTooltip={false} />
+                            Verified
+                          </span>
+                        )}
+                        {activeUserDetail.isBanned ? (
+                          <span className="text-[10px] bg-rose-950/90 text-rose-300 font-black px-2.5 py-0.5 rounded-full border border-rose-600/60 shadow-xs">
+                            BANNED ACCOUNT
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-emerald-950/90 text-emerald-300 font-black px-2.5 py-0.5 rounded-full border border-emerald-600/60 shadow-xs">
+                            ACTIVE
+                          </span>
+                        )}
+                        <span className="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-full uppercase border border-slate-700">
+                          {activeUserDetail.role || 'User'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
+                        <span className="font-mono text-purple-300 font-bold select-all">
+                          {activeUserDetail.email}
+                        </span>
+                        {activeUserDetail.email && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(activeUserDetail.email || '', `modal-email-${activeUserDetail.uid}`)}
+                            className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                            title="Copy Email"
+                          >
+                            {copiedId === `modal-email-${activeUserDetail.uid}` ? (
+                              <Check className="w-3 h-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        )}
+                        <span>•</span>
+                        <span className="text-slate-400 text-[11px] font-mono">
+                          UID: <strong className="text-slate-300 select-all">{activeUserDetail.uid}</strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 flex-wrap">
+                        <span>Referral Code: <strong className="text-amber-300 font-mono select-all">{activeUserDetail.referralCode || 'N/A'}</strong></span>
+                        <span>({activeUserDetail.referralCount || 0} users invited)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserDetail(null)}
+                    className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    title="Close Details"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Primary Quick Action Bar: Blue Tick, Ban/Unban, Edit Profile, Coin History */}
+                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-800/80 flex-wrap text-xs">
+                  {/* Blue Tick Toggle */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nextVal = !activeUserDetail.isVerified;
+                      setUsersList(prev => prev.map(u => u.uid === activeUserDetail.uid ? { ...u, isVerified: nextVal } : u));
+                      sound.playWin();
+                      try {
+                        await toggleUserVerified(activeUserDetail.uid, nextVal);
+                      } catch (err) {
+                        console.error('Failed to toggle verified:', err);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-sm ${
+                      activeUserDetail.isVerified
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 hover:bg-sky-500/30'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    <VerifiedBadge size="xs" showTooltip={false} />
+                    <span>{activeUserDetail.isVerified ? 'Blue Tick: ACTIVE' : 'Grant Blue Tick'}</span>
+                  </button>
+
+                  {/* Ban / Unban Toggle */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nextBan = !activeUserDetail.isBanned;
+                      setUsersList(prev => prev.map(u => u.uid === activeUserDetail.uid ? { ...u, isBanned: nextBan } : u));
+                      sound.playTick();
+                      try {
+                        await toggleUserBan(activeUserDetail.uid, nextBan);
+                      } catch (err) {
+                        console.error('Failed to toggle ban:', err);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-sm ${
+                      activeUserDetail.isBanned
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-600 hover:bg-emerald-900'
+                        : 'bg-rose-950 text-rose-300 border-rose-600 hover:bg-rose-900'
+                    }`}
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>{activeUserDetail.isBanned ? 'Unban Account' : 'Ban Account'}</span>
+                  </button>
+
+                  {/* Edit Name & Avatar */}
+                  <button
+                    type="button"
+                    onClick={() => openEditProfileModal(activeUserDetail)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Edit Name &amp; Photo</span>
+                  </button>
+
+                  {/* Audit Coin History */}
+                  <button
+                    type="button"
+                    onClick={() => openUserHistoryModal(activeUserDetail)}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/60 font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  >
+                    <History className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Coin History ({userTransactions.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Modal Content */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+                {/* 1. Core Financial & Activity Stats Grid */}
+                <div>
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Wallet &amp; Earnings Overview</span>
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div className="bg-[#070A12] p-3 rounded-2xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Wallet Balance</span>
+                      <div className="font-display font-black text-lg text-amber-400 mt-1">
+                        {(activeUserDetail.coins || 0).toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold">
+                        ≈ ₹{((activeUserDetail.coins || 0) / 100).toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#070A12] p-3 rounded-2xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Total Earned</span>
+                      <div className="font-display font-black text-lg text-emerald-400 mt-1">
+                        {(activeUserDetail.totalEarned || 0).toLocaleString()}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold">
+                        Lifetime coins
+                      </div>
+                    </div>
+
+                    <div className="bg-[#070A12] p-3 rounded-2xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Referral Invites</span>
+                      <div className="font-display font-black text-lg text-purple-300 mt-1">
+                        {activeUserDetail.referralCount || 0}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold">
+                        3% commission tier
+                      </div>
+                    </div>
+
+                    <div className="bg-[#070A12] p-3 rounded-2xl border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold block">Withdrawal Task Gate</span>
+                      <div className="font-display font-black text-lg text-indigo-300 mt-1">
+                        {activeUserDetail.completedTasksCount || 0} / {activeUserDetail.requiredTasksForWithdrawal ?? 3}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold">
+                        {(activeUserDetail.completedTasksCount || 0) >= (activeUserDetail.requiredTasksForWithdrawal ?? 3)
+                          ? '✅ Unlocked'
+                          : '🔒 Locked'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Fast Coins Adjustment Section */}
+                <div className="bg-[#070A12] p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                      <GoldCoin className="w-4 h-4 text-amber-400" />
+                      <span>Instant Coin Adjustment</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Current: <strong className="text-amber-400 font-bold">{(activeUserDetail.coins || 0).toLocaleString()}</strong>
+                    </span>
+                  </div>
+
+                  {/* Preset Buttons */}
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
+                    {[100, 500, 1000, 5000].map(amt => (
+                      <button
+                        key={`modal-add-${amt}`}
+                        type="button"
+                        onClick={() => handleQuickAdjustCoinsInModal(activeUserDetail, amt)}
+                        className="py-1.5 px-2 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 font-black rounded-xl text-[11px] transition-all cursor-pointer active:scale-95"
+                      >
+                        +{amt.toLocaleString()}
+                      </button>
+                    ))}
+                    {[-100, -500].map(amt => (
+                      <button
+                        key={`modal-ded-${amt}`}
+                        type="button"
+                        onClick={() => handleQuickAdjustCoinsInModal(activeUserDetail, amt)}
+                        className="py-1.5 px-2 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 font-black rounded-xl text-[11px] transition-all cursor-pointer active:scale-95"
+                      >
+                        {amt.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom Coins Input */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="number"
+                      value={detailCustomCoins}
+                      onChange={(e) => setDetailCustomCoins(Number(e.target.value))}
+                      placeholder="Custom amount (e.g. 250 or -150)"
+                      className="flex-1 px-3 py-2 bg-[#0E1524] border border-slate-700 rounded-xl text-xs font-bold text-amber-400 outline-none focus:border-amber-400"
+                    />
+                    <input
+                      type="text"
+                      value={detailCustomReason}
+                      onChange={(e) => setDetailCustomReason(e.target.value)}
+                      placeholder="Reason for adjustment"
+                      className="flex-1 px-3 py-2 bg-[#0E1524] border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (detailCustomCoins !== 0) {
+                          handleQuickAdjustCoinsInModal(activeUserDetail, detailCustomCoins, detailCustomReason);
+                        }
+                      }}
+                      className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Referrals & Withdrawal Task Gate Adjustment */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Referrals Section */}
+                  <div className="bg-[#070A12] p-4 rounded-2xl border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-purple-400" />
+                        <span>Referrals Adjustment</span>
+                      </span>
+                      <span className="text-purple-300 font-mono font-bold">
+                        {activeUserDetail.referralCount || 0} refs
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjustRefsInModal(activeUserDetail, 1)}
+                        className="flex-1 py-1.5 bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-700/60 font-bold rounded-xl text-xs cursor-pointer active:scale-95"
+                      >
+                        +1 Ref
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjustRefsInModal(activeUserDetail, 5)}
+                        className="flex-1 py-1.5 bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-700/60 font-bold rounded-xl text-xs cursor-pointer active:scale-95"
+                      >
+                        +5 Refs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjustRefsInModal(activeUserDetail, -1)}
+                        className="flex-1 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 font-bold rounded-xl text-xs cursor-pointer active:scale-95"
+                      >
+                        -1 Ref
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Withdrawal Task Gate Adjustment */}
+                  <div className="bg-[#070A12] p-4 rounded-2xl border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-300 flex items-center gap-1.5">
+                        <ListTodo className="w-4 h-4 text-indigo-400" />
+                        <span>Withdrawal Task Gate</span>
+                      </span>
+                      <span className="text-indigo-300 font-mono font-bold">
+                        {activeUserDetail.completedTasksCount || 0} done / {activeUserDetail.requiredTasksForWithdrawal ?? 3} req
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjustTasks(activeUserDetail, 1)}
+                        className="flex-1 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 font-bold rounded-xl text-xs cursor-pointer active:scale-95"
+                      >
+                        +1 Done
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAdjustTasks(activeUserDetail, -1)}
+                        className="flex-1 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 font-bold rounded-xl text-xs cursor-pointer active:scale-95"
+                      >
+                        -1 Done
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReqEditUser(activeUserDetail);
+                          setReqRequiredCount(activeUserDetail.requiredTasksForWithdrawal !== undefined ? activeUserDetail.requiredTasksForWithdrawal : 3);
+                          setReqCompletedCount(activeUserDetail.completedTasksCount || 0);
+                        }}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
+                      >
+                        Edit Rule
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Network, IP & Device Security Audit */}
+                <div className="bg-[#070A12] p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Network &amp; Device Fingerprint Audit</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#0E1524] border border-slate-800 space-y-1">
+                      <div className="flex items-center gap-1 text-slate-400 text-[10px]">
+                        <Globe className="w-3 h-3 text-cyan-400" />
+                        <span>Last IP Address:</span>
+                      </div>
+                      <div className="font-mono font-bold text-white select-all">
+                        {activeUserDetail.lastIp || '127.0.0.1'}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#0E1524] border border-slate-800 space-y-1">
+                      <div className="flex items-center gap-1 text-slate-400 text-[10px]">
+                        <Wifi className="w-3 h-3 text-indigo-400" />
+                        <span>Network Carrier:</span>
+                      </div>
+                      <div className="font-bold text-white">
+                        {activeUserDetail.networkType || '4G/Wi-Fi'}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#0E1524] border border-slate-800 space-y-1">
+                      <div className="flex items-center gap-1 text-slate-400 text-[10px]">
+                        <Smartphone className="w-3 h-3 text-amber-400" />
+                        <span>Device Fingerprint:</span>
+                      </div>
+                      <div className="font-mono text-white truncate text-[11px]" title={activeUserDetail.deviceId || 'Not recorded'}>
+                        {activeUserDetail.deviceId || 'Unknown'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Multi-Account Detection Warning */}
+                  {(() => {
+                    const ip = (activeUserDetail.lastIp || '').trim();
+                    const dev = (activeUserDetail.deviceId || '').trim();
+                    const sameIp = ip && ip !== '127.0.0.1' ? (usersByIpMap[ip] || []) : [];
+                    const sameDev = dev ? (usersByDeviceMap[dev] || []) : [];
+
+                    if (sameIp.length <= 1 && sameDev.length <= 1) {
+                      return (
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>No duplicate IP or Device accounts detected. Account looks clean!</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1.5">
+                        <div className="flex items-center gap-2 font-bold text-amber-300">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Multi-Account Alert: Identical IP or Device ID Shared!</span>
+                        </div>
+                        {sameIp.length > 1 && (
+                          <div className="text-[11px] text-slate-300">
+                            <strong>{sameIp.length} accounts</strong> registered on IP ({ip}):{' '}
+                            <span className="text-amber-300 font-mono">
+                              {sameIp.map(x => x.email).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                        {sameDev.length > 1 && (
+                          <div className="text-[11px] text-slate-300">
+                            <strong>{sameDev.length} accounts</strong> registered on same Phone Device:{' '}
+                            <span className="text-amber-300 font-mono">
+                              {sameDev.map(x => x.email).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 5. Danger / Reset Actions */}
+                <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div>
+                    <span className="font-bold text-rose-300 block">Reset User Wallet</span>
+                    <span className="text-[11px] text-slate-400">Zero out coins &amp; referrals for this specific player account</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleResetSingleUser(activeUserDetail)}
+                    className="px-3.5 py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 font-bold rounded-xl text-xs transition-all cursor-pointer active:scale-95 shrink-0"
+                  >
+                    Reset Coins to 0
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-[#070A12] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                <span>
+                  Registered: <strong className="text-slate-200">{activeUserDetail.createdAt ? new Date(activeUserDetail.createdAt).toLocaleDateString() : 'N/A'}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserDetail(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

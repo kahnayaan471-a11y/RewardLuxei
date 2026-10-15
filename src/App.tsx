@@ -21,11 +21,15 @@ import { FullScreenCaptchaPage } from './components/FullScreenCaptchaPage';
 import { TaskOfferwallView } from './components/TaskOfferwallView';
 import { OfferDetailsView } from './components/OfferDetailsView';
 import { BannedUserScreen } from './components/BannedUserScreen';
-import { AppTask, UserTaskProgress } from './types';
+import { VpnBlockedScreen } from './components/VpnBlockedScreen';
+import { checkIsVpn, VpnCheckResult } from './utils/vpnDetector';
+import { AppTask, UserTaskProgress, FeatureToggles } from './types';
 import {
   fetchUserTaskProgress,
   subscribeToUserTaskProgress,
-  fetchLeaderboard
+  fetchLeaderboard,
+  subscribeToFeatureToggles,
+  DEFAULT_FEATURE_TOGGLES
 } from './services/coinService';
 
 export const checkIsAdminPath = () => {
@@ -68,6 +72,35 @@ const MainApp: React.FC = () => {
   const [tasksInitialTab, setTasksInitialTab] = useState<'available' | 'history'>('available');
   const [selectedOfferTask, setSelectedOfferTask] = useState<AppTask | null>(null);
   const [userTasksProgress, setUserTasksProgress] = useState<Record<string, UserTaskProgress>>({});
+  const [vpnResult, setVpnResult] = useState<VpnCheckResult | null>(null);
+  const [featureToggles, setFeatureToggles] = useState<FeatureToggles>(DEFAULT_FEATURE_TOGGLES);
+
+  // Subscribe to live Feature Toggles (including Anti-VPN Shield setting)
+  useEffect(() => {
+    const unsubToggles = subscribeToFeatureToggles((toggles) => {
+      setFeatureToggles(toggles);
+    });
+    return () => {
+      unsubToggles();
+    };
+  }, []);
+
+  // Anti-VPN Live Guard: Scan user connection to block unauthorized VPN/Proxy access
+  useEffect(() => {
+    if (!isAdminRoute && !isAdmin && featureToggles.blockVpn !== false) {
+      checkIsVpn()
+        .then((res) => {
+          if (res.isVpn) {
+            setVpnResult(res);
+          } else {
+            setVpnResult(null);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setVpnResult(null);
+    }
+  }, [isAdminRoute, isAdmin, featureToggles.blockVpn]);
 
   useEffect(() => {
     if (profile?.uid) {
@@ -114,17 +147,22 @@ const MainApp: React.FC = () => {
     );
   }
 
-  // BANNED/SUSPENDED USER FULL-SCREEN OVERLAY (KHOOB BADA RONG / GIANT BAN SCREEN)
-  if (profile?.isBanned && !isAdmin) {
-    return <BannedUserScreen profile={profile} onLogout={logout} />;
-  }
-
   // 1. ADMIN ROUTE (/admin) -> Exclusively opens Admin Portal & Control Center
   if (isAdminRoute) {
     return <AdminPortalPage />;
   }
 
-  // 2. USER PANEL (/) -> Exclusively for Players
+  // 2. ANTI-VPN SECURITY WALL: Block any normal user entering via VPN or Proxy
+  if (featureToggles.blockVpn !== false && vpnResult?.isVpn && !isAdmin) {
+    return <VpnBlockedScreen vpnResult={vpnResult} onResolved={() => setVpnResult(null)} />;
+  }
+
+  // 3. BANNED/SUSPENDED USER FULL-SCREEN OVERLAY (KHOOB BADA RONG / GIANT BAN SCREEN)
+  if (profile?.isBanned && !isAdmin) {
+    return <BannedUserScreen profile={profile} onLogout={logout} />;
+  }
+
+  // 4. USER PANEL (/) -> Exclusively for Players
   return (
     <div className={`min-h-screen ${isDark ? 'bg-[#070A12] text-slate-100' : 'bg-slate-50 text-slate-900'} flex flex-col selection:bg-amber-500 selection:text-white transition-colors duration-200`}>
       {/* Top Header */}
